@@ -9,6 +9,7 @@ interface MainLayoutProps {
   sidebarContent?: ReactNode;
   searchTerm?: string;
   onSearchTermChange?: (value: string) => void;
+  onHomeClick?: () => void;
 }
 
 export function MainLayout({
@@ -17,6 +18,7 @@ export function MainLayout({
   sidebarContent,
   searchTerm = '',
   onSearchTermChange,
+  onHomeClick,
 }: MainLayoutProps) {
   const [internalSearchTerm, setInternalSearchTerm] = useState('');
   const activeSearchTerm = onSearchTermChange ? searchTerm : internalSearchTerm;
@@ -33,7 +35,16 @@ export function MainLayout({
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {sidebarContent ?? (
               <div>
-                <h2 className="text-lg font-semibold">Asistente RGA</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSearchTermChange('');
+                    onHomeClick?.();
+                  }}
+                  className="cursor-pointer text-left text-lg font-semibold text-slate-900 transition-all duration-200 hover:text-sky-700"
+                >
+                  Asistente RGA
+                </button>
                 <p className="mt-2 text-sm text-slate-600">
                   Navegacion del asistente de supervivencia.
                 </p>

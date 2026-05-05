@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
 import { ResultCard } from './components/ui/ResultCard';
+import { categoryThemes } from './constants/categoryColors';
 import manualEntries from './data/manual.json';
 import { useSearch } from './hooks/useSearch';
 import type { KnowledgeCategory, KnowledgeEntry } from './types';
@@ -22,7 +23,11 @@ export const App = () => {
   };
 
   return (
-    <MainLayout searchTerm={searchTerm} onSearchTermChange={setSearchTerm}>
+    <MainLayout
+      searchTerm={searchTerm}
+      onSearchTermChange={setSearchTerm}
+      onHomeClick={() => setSearchTerm('')}
+    >
       <section className="space-y-6">
         {hasSearchTerm ? (
           <>
@@ -70,7 +75,7 @@ export const App = () => {
                   key={category}
                   type="button"
                   onClick={() => setSearchTerm(categorySearchMap[category] ?? category)}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800"
+                  className={`rounded-full border px-4 py-2 text-sm font-medium transition-all duration-200 ${categoryThemes[category].chip}`}
                 >
                   {category}
                 </button>
