@@ -61,7 +61,15 @@ export function useSearch(entries: KnowledgeEntry[], rawSearchTerm: string) {
     return entries.filter(
       (entry) =>
         entry.titulo.toLowerCase().includes(term) ||
-        entry.tags.some((tag) => tag.toLowerCase().includes(term)),
+        entry.categoria.toLowerCase().includes(term) ||
+        entry.contenido.toLowerCase().includes(term) ||
+        entry.tags.some((tag) => tag.toLowerCase().includes(term)) ||
+        entry.pasos?.some((step) => step.toLowerCase().includes(term)) ||
+        entry.comandos?.some(
+          (command) =>
+            command.label.toLowerCase().includes(term) ||
+            command.value.toLowerCase().includes(term),
+        ),
     );
   }, [entries, rawSearchTerm]);
 }

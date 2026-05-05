@@ -1,0 +1,58 @@
+[
+  {
+    "id": "env-int1",
+    "titulo": "Entorno INT1",
+    "categoria": "Entorno",
+    "contenido": "URL de escritorio y puertos del entorno INT1 para acceso remoto y validaciones basicas.",
+    "pasos": [
+      "Abrir la URL de escritorio remoto de INT1.",
+      "Verificar que los puertos de acceso y servicios esten disponibles.",
+      "Confirmar conectividad antes de lanzar pruebas."
+    ],
+    "comandos": [
+      {
+        "label": "Puerto escritorio",
+        "value": "3389"
+      },
+      {
+        "label": "Puerto aplicacion",
+        "value": "8080"
+      }
+    ],
+    "tags": ["int1", "entorno", "url", "puertos", "escritorio"]
+  },
+  {
+    "id": "batch-config",
+    "titulo": "Configuracion Batch",
+    "categoria": "Batch",
+    "contenido": "Tablas BAT_TRABAJO_CONFIG y BAT_SUBTRABAJO_CONFIG usadas para revisar la configuracion batch.",
+    "pasos": [
+      "Consultar BAT_TRABAJO_CONFIG para localizar el trabajo principal.",
+      "Revisar BAT_SUBTRABAJO_CONFIG para validar dependencias y orden.",
+      "Documentar cualquier cambio antes de desplegar."
+    ],
+    "comandos": [
+      {
+        "label": "Tabla trabajo",
+        "value": "SELECT * FROM BAT_TRABAJO_CONFIG;"
+      },
+      {
+        "label": "Tabla subtrabajo",
+        "value": "SELECT * FROM BAT_SUBTRABAJO_CONFIG;"
+      }
+    ],
+    "tags": ["batch", "configuracion", "tablas", "sql", "trabajos"]
+  },
+  {
+    "id": "uml-lock",
+    "titulo": "Protocolo SVN Lock",
+    "categoria": "UML",
+    "contenido": "Pasos Update -> Lock -> Diseno para evitar conflictos sobre artefactos UML compartidos.",
+    "pasos": [
+      "Hacer Update del proyecto antes de tocar el diagrama.",
+      "Aplicar Lock sobre el archivo UML en SVN.",
+      "Realizar el diseno y liberar el Lock cuando termine la edicion."
+    ],
+    "tags": ["uml", "svn", "lock", "diseno", "update"]
+  }
+]

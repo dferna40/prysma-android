@@ -6,6 +6,8 @@ interface MainLayoutProps {
   children: ReactNode;
   topBarContent?: ReactNode;
   sidebarContent?: ReactNode;
+  searchTerm?: string;
+  onSearchTermChange?: (value: string) => void;
 }
 
 interface SidebarAccount {
@@ -44,8 +46,12 @@ export function MainLayout({
   children,
   topBarContent,
   sidebarContent,
+  searchTerm = '',
+  onSearchTermChange,
 }: MainLayoutProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
+  const activeSearchTerm = onSearchTermChange ? searchTerm : internalSearchTerm;
+  const handleSearchTermChange = onSearchTermChange ?? setInternalSearchTerm;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -140,7 +146,10 @@ export function MainLayout({
                   <h1 className="text-base font-semibold md:text-lg">
                     Asistente de Supervivencia RGA
                   </h1>
-                  <SearchBar value={searchTerm} onChange={setSearchTerm} />
+                  <SearchBar
+                    value={activeSearchTerm}
+                    onChange={handleSearchTermChange}
+                  />
                 </div>
               </div>
             )}
