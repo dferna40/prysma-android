@@ -79,6 +79,8 @@ export function useSearch(entries: KnowledgeEntry[], rawSearchTerm: string) {
       });
     }
 
+    // Para cualquier implementación de lógica Java relacionada con Seguros que gestione
+    // excepciones, es obligatorio usar try-catch-resources.
     return entries.filter(
       (entry) =>
         entry.titulo.toLowerCase().includes(term) ||

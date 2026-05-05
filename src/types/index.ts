@@ -1,4 +1,10 @@
-export type KnowledgeCategory = 'Entorno' | 'Batch' | 'UI' | 'UML' | 'General';
+export type KnowledgeCategory =
+  | 'Entorno'
+  | 'Batch'
+  | 'UI'
+  | 'UML'
+  | 'General'
+  | 'Seguros';
 
 export interface CommandOption {
   label: string;

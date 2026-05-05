@@ -9,10 +9,18 @@ import type { KnowledgeCategory, KnowledgeEntry } from './types';
 export const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const entries = manualEntries as KnowledgeEntry[];
+  const homeCategories: KnowledgeCategory[] = [
+    'Entorno',
+    'Batch',
+    'UML',
+    'UI',
+    'General',
+    'Seguros',
+  ];
   const results = useSearch(entries, searchTerm);
-  const categories = Array.from(
-    new Set(entries.map((entry) => entry.categoria)),
-  ) as KnowledgeCategory[];
+  const categories = homeCategories.filter(
+    (category, index) => homeCategories.indexOf(category) === index,
+  );
   const hasSearchTerm = searchTerm.trim().length > 0;
   const categorySearchMap: Record<KnowledgeCategory, string> = {
     Entorno: '/env ',
@@ -20,6 +28,7 @@ export const App = () => {
     UI: 'UI',
     UML: '/uml ',
     General: 'General',
+    Seguros: 'Seguros',
   };
 
   return (

@@ -10,14 +10,8 @@
       "Confirmar conectividad antes de lanzar pruebas."
     ],
     "comandos": [
-      {
-        "label": "Puerto escritorio",
-        "value": "3389"
-      },
-      {
-        "label": "Puerto aplicacion",
-        "value": "8080"
-      }
+      { "label": "Puerto escritorio", "value": "3389" },
+      { "label": "Puerto aplicacion", "value": "8080" }
     ],
     "tags": ["int1", "entorno", "url", "puertos", "escritorio"]
   },
@@ -32,14 +26,8 @@
       "Documentar cualquier cambio antes de desplegar."
     ],
     "comandos": [
-      {
-        "label": "Tabla trabajo",
-        "value": "SELECT * FROM BAT_TRABAJO_CONFIG;"
-      },
-      {
-        "label": "Tabla subtrabajo",
-        "value": "SELECT * FROM BAT_SUBTRABAJO_CONFIG;"
-      }
+      { "label": "Tabla trabajo", "value": "SELECT * FROM BAT_TRABAJO_CONFIG;" },
+      { "label": "Tabla subtrabajo", "value": "SELECT * FROM BAT_SUBTRABAJO_CONFIG;" }
     ],
     "tags": ["batch", "configuracion", "tablas", "sql", "trabajos"]
   },
@@ -54,5 +42,66 @@
       "Realizar el diseno y liberar el Lock cuando termine la edicion."
     ],
     "tags": ["uml", "svn", "lock", "diseno", "update"]
-  }
+  },
+  {
+    "id": "arch-npa-capas",
+    "titulo": "Arquitectura NPA: Capas",
+    "categoria": "UI",
+    "contenido": "Division de responsabilidades en los proyectos NPA.",
+    "pasos": [
+      "Proyecto-ca: Capa de presentacion y controladores.",
+      "Proyecto-co: Capa de negocio y servicios.",
+      "Proyecto sin sufijo: Entidades, DAOs y mapeo de datos."
+    ],
+    "tags": ["arquitectura", "npa", "capas", "organizacion"]
+  },
+  {
+    "id": "entorno-local-rutas",
+    "titulo": "Rutas Criticas Locales",
+    "categoria": "Entorno",
+    "contenido": "Ubicaciones clave en C:\\EntornoOnesait para el desarrollo diario.",
+    "comandos": [
+      { "label": "Entorno Raiz", "value": "C:\\EntornoOnesait" },
+      { "label": "Repo Maven", "value": "C:\\EntornoOnesait\\LocalRepoM3" },
+      { "label": "JBoss Home", "value": "C:\\EntornoOnesait\\EAP-7.4.0" }
+    ],
+    "tags": ["rutas", "jboss", "maven", "local"]
+  },
+  {
+    "id": "ui-literales",
+    "titulo": "Cambio de Literales",
+    "categoria": "UI",
+    "contenido": "Ruta y protocolo para modificar textos en la interfaz.",
+    "pasos": [
+      "Localizar el XML en npa-catalogos_servicios\\xml.",
+      "Modificar el literal respetando el formato.",
+      "Realizar el despliegue para refrescar la cache."
+    ],
+    "tags": ["literales", "textos", "xml", "interfaz"]
+  },
+  {
+    "id": "iteams-despliegue",
+    "titulo": "Protocolo iTeams",
+    "categoria": "General",
+    "contenido": "Pasos para solicitar subidas y gestionar Tags.",
+    "pasos": [
+      "Generar el Tag correspondiente a la tarea.",
+      "Solicitar la subida a traves de iTeams.",
+      "Verificar el merge una vez completado."
+    ],
+    "tags": ["iteams", "merge", "tag", "despliegue"]
+  },
+  {
+  "id": "glosario-seguros-base",
+  "titulo": "Glosario de Seguros y Negocio",
+  "categoria": "Seguros",
+  "contenido": "Conceptos clave del negocio asegurador y términos específicos del proyecto RGA.",
+  "pasos": [
+    "Póliza: Contrato de seguro que une al cliente con la compañía.",
+    "Recibo: Documento que justifica el pago de la prima (importante en flujos Batch).",
+    "Taller: Nombre interno para referirse a la Base de Datos (BBDD).",
+    "BO: Terminal financiero o Back Office utilizado para operativas de negocio."
+  ],
+  "tags": ["seguros", "negocio", "glosario", "rga", "conceptos"]
+}
 ]

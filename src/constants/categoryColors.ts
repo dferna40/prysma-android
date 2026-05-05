@@ -6,6 +6,7 @@ export const categoryColors: Record<KnowledgeCategory, string> = {
   UML: 'amber',
   UI: 'indigo',
   General: 'indigo',
+  Seguros: 'rose',
 };
 
 export const categoryThemes: Record<
@@ -56,5 +57,13 @@ export const categoryThemes: Record<
       'border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-300 hover:bg-indigo-100 hover:text-indigo-800',
     button:
       'hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-800',
+  },
+  Seguros: {
+    cardAccent: 'border-l-rose-500',
+    badge: 'bg-rose-50 text-rose-700',
+    chip:
+      'border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300 hover:bg-rose-100 hover:text-rose-800',
+    button:
+      'hover:border-rose-300 hover:bg-rose-50 hover:text-rose-800',
   },
 };
