@@ -103,5 +103,51 @@
     "BO: Terminal financiero o Back Office utilizado para operativas de negocio."
   ],
   "tags": ["seguros", "negocio", "glosario", "rga", "conceptos"]
-}
+}, 
+{
+    "id": "acc-indra-mail",
+    "titulo": "Correo Electrónico Indra",
+    "categoria": "Accesos",
+    "contenido": "Acceso al correo corporativo de Indra (Outlook).",
+    "comandos": [
+      { "label": "Usuario", "value": "dfernandezra@eservicios.indra.es" },
+      { "label": "Password", "value": "Oculus2048" }
+    ],
+    "tags": ["correo", "indra", "outlook", "login"]
+  },
+  {
+    "id": "acc-ssh-oracle",
+    "titulo": "Sistemas: SSH y Oracle",
+    "categoria": "Accesos",
+    "contenido": "Credenciales para acceso a servidores vía SSH y bases de datos Oracle.",
+    "comandos": [
+      { "label": "User SSH", "value": "davidfr" },
+      { "label": "Pass SSH", "value": "RGA" },
+      { "label": "User Oracle", "value": "davidfr" },
+      { "label": "Pass Oracle", "value": "cambiar" }
+    ],
+    "tags": ["ssh", "oracle", "db", "servidor"]
+  },
+  {
+    "id": "acc-cezanne",
+    "titulo": "Cezanne Keapps (Portal)",
+    "categoria": "Accesos",
+    "contenido": "Acceso al portal del empleado de Keapps para gestión de RRHH.",
+    "comandos": [
+      { "label": "Usuario", "value": "david_fernandez@keapps.es" },
+      { "label": "Password", "value": "Oculus2048" }
+    ],
+    "tags": ["cezanne", "keapps", "portal", "rrhh"]
+  },
+  {
+    "id": "acc-keapps-mail",
+    "titulo": "Correo Electrónico Keapps",
+    "categoria": "Accesos",
+    "contenido": "Acceso al servicio de correo corporativo de Keapps.",
+    "comandos": [
+      { "label": "Usuario", "value": "david.fernandez@keapps.es" },
+      { "label": "Password", "value": "K-12403301e-2026" }
+    ],
+    "tags": ["correo", "keapps", "webmail"]
+  }
 ]
