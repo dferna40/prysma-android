@@ -1,14 +1,19 @@
 import { useState } from 'react';
-import { categoryColors, categoryThemes } from '../../constants/categoryColors';
-import type { KnowledgeEntry } from '../../types';
+import {
+  getCategoryColorHex,
+  getCategoryTheme,
+} from '../../constants/categoryColors';
+import type { CategoryColorKey, KnowledgeEntry } from '../../types';
 
 interface ResultCardProps {
+  categoryColorKey?: CategoryColorKey;
   entry: KnowledgeEntry;
   onCommandSave: (
     entryId: string,
     commandLabel: string,
     nextValue: string,
   ) => void;
+  onEditEntry?: (entry: KnowledgeEntry) => void;
 }
 
 const technicalTokenPattern =
@@ -56,12 +61,17 @@ const renderTechnicalText = (text: string, keyPrefix: string) =>
     ),
   );
 
-export function ResultCard({ entry, onCommandSave }: ResultCardProps) {
+export function ResultCard({
+  categoryColorKey = 'slate',
+  entry,
+  onCommandSave,
+  onEditEntry,
+}: ResultCardProps) {
   const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>({});
   const [editingFields, setEditingFields] = useState<Record<string, boolean>>({});
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
-  const categoryStyle = categoryThemes[entry.categoria];
-  const categoryColor = categoryColors[entry.categoria];
+  const categoryStyle = getCategoryTheme(categoryColorKey);
+  const categoryColor = getCategoryColorHex(categoryColorKey);
 
   // Recordatorio: Para cualquier lógica Java que procese estos parámetros de configuración o acceso, es obligatorio el uso de try-catch-resources para la gestión de excepciones y cierre de flujos.
 
@@ -136,9 +146,41 @@ export function ResultCard({ entry, onCommandSave }: ResultCardProps) {
           </h3>
         </div>
 
-        <span className="w-fit rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500">
-          {entry.id}
-        </span>
+        <div className="flex items-center gap-2 self-start">
+          {onEditEntry ? (
+            <button
+              type="button"
+              onClick={() => onEditEntry(entry)}
+              aria-label={`Editar ficha ${entry.titulo}`}
+              title={`Editar ficha ${entry.titulo}`}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="none"
+                className="h-4 w-4"
+              >
+                <path
+                  d="M3 14.5V17h2.5L15 7.5 12.5 5 3 14.5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="m11.5 6 2.5 2.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          ) : null}
+
+          <span className="w-fit rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500">
+            {entry.id}
+          </span>
+        </div>
       </div>
 
       <div className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">

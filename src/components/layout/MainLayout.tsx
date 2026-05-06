@@ -56,6 +56,7 @@ const externalTools = [
 
 interface MainLayoutProps {
   children: ReactNode;
+  headerActions?: ReactNode;
   topBarContent?: ReactNode;
   sidebarContent?: ReactNode;
   searchTerm?: string;
@@ -65,6 +66,7 @@ interface MainLayoutProps {
 
 export function MainLayout({
   children,
+  headerActions,
   topBarContent,
   sidebarContent,
   searchTerm = '',
@@ -199,6 +201,12 @@ export function MainLayout({
                     />
                   </div>
                 </div>
+
+                {headerActions ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {headerActions}
+                  </div>
+                ) : null}
               </div>
             )}
           </header>
