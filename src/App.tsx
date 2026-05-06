@@ -451,7 +451,7 @@ export const App = () => {
           return;
         }
 
-        // Recordatorio: Si esta exportacion tecnica se procesa posteriormente en un entorno Java (como un servicio de almacenamiento de documentos), es obligatorio el uso de try-catch-resources para el manejo seguro de los flujos de archivos.
+        // Recordatorio: Para cualquier implementacion en Java que gestione la exportacion de esta documentacion tecnica, es obligatorio utilizar try-catch-resources para el cierre seguro de los flujos de archivos PDF.
         await html2pdf()
           .set({
             filename,

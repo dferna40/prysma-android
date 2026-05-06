@@ -36,11 +36,11 @@ const pdfMarkdownComponents = {
       {...props}
       style={{
         color: '#2563eb',
-        lineHeight: 1.5,
+        lineHeight: 1.6,
         textDecoration: 'underline',
         fontWeight: 600,
         overflow: 'visible',
-        padding: '1px 0',
+        padding: '1px 0 3px',
       }}
     />
   ),
@@ -62,9 +62,9 @@ const pdfMarkdownComponents = {
             color: '#0f172a',
             fontFamily: '"Courier New", monospace',
             fontSize: 9,
-            lineHeight: 1.5,
+            lineHeight: 1.6,
             overflow: 'visible',
-            padding: '1px 5px',
+            padding: '1px 5px 3px',
           }}
         >
           {children}
@@ -89,7 +89,7 @@ const pdfMarkdownComponents = {
             color: '#0f172a',
             fontFamily: '"Courier New", monospace',
             fontSize: 9,
-            lineHeight: 1.5,
+            lineHeight: 1.6,
             margin: 0,
             overflowX: 'auto',
             overflowY: 'visible',
@@ -110,10 +110,10 @@ const pdfMarkdownComponents = {
         color: '#0f172a',
         fontSize: 16,
         fontWeight: 700,
-        lineHeight: 1.5,
+        lineHeight: 1.6,
         margin: '16px 0 8px',
         overflow: 'visible',
-        padding: '4px 0',
+        padding: '4px 0 3px',
       }}
     />
   ),
@@ -126,13 +126,13 @@ const pdfMarkdownComponents = {
         id={anchorId}
         style={{
           color: '#0f172a',
-          fontSize: 14,
+          fontSize: 13,
           borderBottom: '1px solid #e2e8f0',
           fontWeight: 700,
-          lineHeight: 1.5,
+          lineHeight: 1.6,
           margin: '16px 0 8px',
           overflow: 'visible',
-          padding: '4px 0 4px',
+          padding: '4px 0 3px',
           paddingBottom: 4,
         }}
       />
@@ -150,10 +150,10 @@ const pdfMarkdownComponents = {
           borderBottom: '1px solid #e2e8f0',
           fontSize: 13,
           fontWeight: 700,
-          lineHeight: 1.5,
+          lineHeight: 1.6,
           margin: '14px 0 6px',
           overflow: 'visible',
-          padding: '3px 0',
+          padding: '3px 0 3px',
           paddingBottom: 3,
         }}
       />
@@ -166,10 +166,10 @@ const pdfMarkdownComponents = {
         color: '#0f172a',
         fontSize: 11,
         fontWeight: 700,
-        lineHeight: 1.5,
+        lineHeight: 1.6,
         margin: '12px 0 5px',
         overflow: 'visible',
-        padding: '2px 0',
+        padding: '2px 0 3px',
       }}
     />
   ),
@@ -193,10 +193,10 @@ const pdfMarkdownComponents = {
       style={{
         color: '#1e293b',
         fontSize: 10.5,
-        lineHeight: 1.5,
+        lineHeight: 1.6,
         marginBottom: 4,
         overflow: 'visible',
-        padding: '1px 0',
+        padding: '1px 0 3px',
       }}
     />
   ),
@@ -209,17 +209,23 @@ const pdfMarkdownComponents = {
       style={{
         color: '#1e293b',
         fontSize: 10.5,
-        lineHeight: 1.5,
+        lineHeight: 1.6,
         margin: '7px 0',
         overflow: 'visible',
-        padding: '1px 0',
+        padding: '1px 0 3px',
       }}
     />
   ),
   strong: (props: ComponentProps<'strong'>) => (
     <strong
       {...props}
-      style={{ color: '#0f172a', fontWeight: 700, lineHeight: 1.5, overflow: 'visible' }}
+      style={{
+        color: '#0f172a',
+        fontWeight: 700,
+        lineHeight: 1.6,
+        overflow: 'visible',
+        paddingBottom: 3,
+      }}
     />
   ),
   table: (props: ComponentProps<'table'>) => (
@@ -248,10 +254,11 @@ const pdfMarkdownComponents = {
       style={{
         borderTop: '1px solid #e2e8f0',
         color: '#1e293b',
-        fontSize: 10,
-        padding: '7px 9px',
-        verticalAlign: 'top',
-      }}
+          fontSize: 10,
+          padding: '7px 9px',
+          lineHeight: 1.6,
+          verticalAlign: 'top',
+        }}
     />
   ),
   th: (props: ComponentProps<'th'>) => (
@@ -262,6 +269,7 @@ const pdfMarkdownComponents = {
         color: '#475569',
         fontSize: 9,
         fontWeight: 700,
+        lineHeight: 1.6,
         letterSpacing: '0.08em',
         padding: '7px 9px',
         textAlign: 'left',
@@ -297,11 +305,9 @@ export function PrintTemplate({
       <header
         className="pdf-avoid-break"
         style={{
-          alignItems: 'baseline',
+          alignItems: 'flex-start',
           borderBottom: '1px solid #cbd5e1',
-          display: 'flex',
-          gap: 16,
-          justifyContent: 'space-between',
+          display: 'block',
           marginBottom: 16,
           overflow: 'visible',
           paddingBottom: 12,
@@ -314,37 +320,27 @@ export function PrintTemplate({
             color: '#0f172a',
             fontSize: 16,
             fontWeight: 700,
-            lineHeight: 1.5,
+            lineHeight: 1.6,
             margin: 0,
             overflow: 'visible',
-            padding: '2px 0',
+            padding: '2px 0 3px',
           }}
         >
           {entry.titulo}
         </h1>
-        <p
-          style={{
-            color: '#475569',
-            display: 'block',
-            fontSize: 10,
-            fontWeight: 700,
-            lineHeight: 1.5,
-            letterSpacing: '0.14em',
-            margin: 0,
-            overflow: 'visible',
-            padding: '2px 0',
-            textAlign: 'right',
-            textTransform: 'uppercase',
-            width: '100%',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          Onsite RGA
-        </p>
       </header>
 
       {category?.description ? (
-        <p style={{ color: '#334155', fontSize: 10.5, lineHeight: 1.5, margin: '0 0 12px', overflow: 'visible', padding: '1px 0' }}>
+        <p
+          style={{
+            color: '#334155',
+            fontSize: 10.5,
+            lineHeight: 1.6,
+            margin: '0 0 12px',
+            overflow: 'visible',
+            padding: '1px 0 3px',
+          }}
+        >
           {category.description}
         </p>
       ) : null}
@@ -366,10 +362,10 @@ export function PrintTemplate({
               color: '#0f172a',
               fontSize: 12,
               fontWeight: 700,
-              lineHeight: 1.5,
+              lineHeight: 1.6,
               margin: 0,
               overflow: 'visible',
-              padding: '1px 0',
+              padding: '1px 0 3px',
             }}
           >
             Indice
@@ -380,10 +376,10 @@ export function PrintTemplate({
                 key={heading.id}
                 style={{
                   fontSize: 10,
-                  lineHeight: 1.4,
+                  lineHeight: 1.6,
                   marginLeft: Math.max(0, (heading.depth - 2) * 8),
                   overflow: 'visible',
-                  padding: '1px 0',
+                  padding: '1px 0 3px',
                 }}
               >
                 {heading.title}
@@ -408,12 +404,12 @@ export function PrintTemplate({
           className="pdf-avoid-break"
           style={{ marginTop: 18, pageBreakInside: 'avoid' }}
         >
-          <h2 style={{ color: '#0f172a', fontSize: 13, fontWeight: 700, margin: '0 0 7px' }}>
+          <h2 style={{ color: '#0f172a', fontSize: 13, fontWeight: 700, lineHeight: 1.6, margin: '0 0 7px', overflow: 'visible', padding: '1px 0 3px' }}>
             Pasos
           </h2>
           <ol style={{ color: '#1e293b', margin: 0, paddingLeft: 18 }}>
             {entry.pasos.map((step) => (
-              <li key={step} style={{ fontSize: 10.5, lineHeight: 1.5, marginBottom: 4, overflow: 'visible', padding: '1px 0' }}>
+              <li key={step} style={{ fontSize: 10.5, lineHeight: 1.6, marginBottom: 4, overflow: 'visible', padding: '1px 0 3px' }}>
                 {step}
               </li>
             ))}
@@ -423,7 +419,7 @@ export function PrintTemplate({
 
       {entry.comandos?.length ? (
         <section style={{ marginTop: 18 }}>
-          <h2 style={{ color: '#0f172a', fontSize: 13, fontWeight: 700, lineHeight: 1.5, margin: '0 0 7px', overflow: 'visible', padding: '1px 0' }}>
+          <h2 style={{ color: '#0f172a', fontSize: 13, fontWeight: 700, lineHeight: 1.6, margin: '0 0 7px', overflow: 'visible', padding: '1px 0 3px' }}>
             Parametros y comandos utiles
           </h2>
           <div style={{ display: 'grid', gap: 4 }}>
@@ -445,10 +441,10 @@ export function PrintTemplate({
                     color: '#0f172a',
                     fontSize: 9.5,
                     fontWeight: 700,
-                    lineHeight: 1.5,
+                    lineHeight: 1.6,
                     margin: 0,
                     overflow: 'visible',
-                    padding: '1px 0',
+                    padding: '1px 0 3px',
                   }}
                 >
                   {command.label}
@@ -463,9 +459,9 @@ export function PrintTemplate({
                     fontFamily: '"Courier New", monospace',
                     fontSize: 9.5,
                     height: 'auto',
-                    lineHeight: 1.5,
+                    lineHeight: 1.6,
                     overflow: 'visible',
-                    padding: '4px 6px',
+                    padding: '4px 6px 3px',
                     width: '130mm',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
