@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
 import { MarkdownRenderer } from './components/ui/MarkdownRenderer';
 import { ResultCard } from './components/ui/ResultCard';
+import { SidebarUtilities } from './components/ui/SidebarUtilities';
 import {
   categoryColorOptions,
   getCategoryTheme,
@@ -9,6 +10,7 @@ import {
 import manualEntries from './data/manual.json';
 import { useSearch } from './hooks/useSearch';
 import type {
+  AppSettings,
   CategoryColorKey,
   CategoryDefinition,
   CommandOption,
@@ -19,6 +21,9 @@ import type {
 
 const STORAGE_KEY = 'knowledge-manual-state-v2';
 const LEGACY_COMMAND_STORAGE_KEY = 'result-card-command-overrides';
+const defaultSettings: AppSettings = {
+  darkMode: false,
+};
 
 const defaultCategoryMetadata: Record<
   string,
@@ -183,6 +188,8 @@ const normalizeManualData = (source: unknown): ManualData => {
     return {
       categories: deriveCategories(entries),
       entries,
+      settings: defaultSettings,
+      trash: [],
     };
   }
 
@@ -198,12 +205,21 @@ const normalizeManualData = (source: unknown): ManualData => {
     return {
       categories,
       entries,
+      settings: {
+        ...defaultSettings,
+        ...(candidate.settings ?? {}),
+      },
+      trash: Array.isArray(candidate.trash)
+        ? candidate.trash.map((entry) => normalizeEntry(entry))
+        : [],
     };
   }
 
   return {
     categories: [],
     entries: [],
+    settings: defaultSettings,
+    trash: [],
   };
 };
 
@@ -232,6 +248,8 @@ const readStoredManualData = (): ManualData => {
     return {
       ...baseManual,
       entries: applyLegacyCommandOverrides(baseManual.entries, legacyOverrides),
+      settings: baseManual.settings,
+      trash: baseManual.trash,
     };
   } catch {
     return baseManual;
@@ -243,7 +261,7 @@ const persistManualData = (manualData: ManualData) => {
     return;
   }
 
-  // Recordatorio: Si en el futuro decides crear un servicio Java para automatizar este borrado de botones o gestión de datos, usa siempre try-catch-resources para el manejo de excepciones de recursos.
+  // Recordatorio: Si se desarrolla un microservicio Java para centralizar estos Health Checks o gestionar la persistencia de la papelera, utilizar estrictamente try-catch-resources para el cierre seguro de flujos y sockets.
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(manualData));
 };
 
@@ -369,6 +387,13 @@ export const App = () => {
     (category) => category.name.toLowerCase() === normalizedSearchTerm,
   );
 
+  useEffect(() => {
+    document.documentElement.classList.toggle(
+      'dark',
+      manualData.settings.darkMode,
+    );
+  }, [manualData.settings.darkMode]);
+
   const openCreateEntryModal = (
     prefilledCategory?: string,
     categoryLocked = false,
@@ -431,6 +456,16 @@ export const App = () => {
       persistManualData(nextManualData);
       return nextManualData;
     });
+  };
+
+  const toggleDarkMode = () => {
+    updateManualData((currentManualData) => ({
+      ...currentManualData,
+      settings: {
+        ...currentManualData.settings,
+        darkMode: !currentManualData.settings.darkMode,
+      },
+    }));
   };
 
   const handleCommandSave = (
@@ -536,6 +571,7 @@ export const App = () => {
         : currentManualData.categories;
 
       return {
+        ...currentManualData,
         categories: deriveCategories(nextEntries, nextCategories),
         entries: nextEntries,
       };
@@ -595,6 +631,7 @@ export const App = () => {
         : [...currentManualData.categories, nextCategoryDefinition];
 
       return {
+        ...currentManualData,
         categories: deriveCategories(nextEntries, nextCategories),
         entries: nextEntries,
       };
@@ -603,11 +640,47 @@ export const App = () => {
     closeModal();
   };
 
+  const handleDeleteEntry = (entryId: string) => {
+    updateManualData((currentManualData) => {
+      const entryToDelete = currentManualData.entries.find(
+        (entry) => entry.id === entryId,
+      );
+
+      if (!entryToDelete) {
+        return currentManualData;
+      }
+
+      return {
+        ...currentManualData,
+        entries: currentManualData.entries.filter((entry) => entry.id !== entryId),
+        trash: [
+          entryToDelete,
+          ...currentManualData.trash.filter((entry) => entry.id !== entryId),
+        ],
+      };
+    });
+  };
+
+  const handleRestoreEntry = (entryId: string) => {
+    updateManualData((currentManualData) => {
+      const entryToRestore = currentManualData.trash.find(
+        (entry) => entry.id === entryId,
+      );
+
+      if (!entryToRestore) {
+        return currentManualData;
+      }
+
+      return {
+        ...currentManualData,
+        entries: [...currentManualData.entries, entryToRestore],
+        trash: currentManualData.trash.filter((entry) => entry.id !== entryId),
+      };
+    });
+  };
+
   const handleExport = () => {
-    const exportPayload = {
-      categories: manualData.categories,
-      entries: manualData.entries,
-    };
+    const exportPayload = manualData;
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
       type: 'application/json',
     });
@@ -696,15 +769,33 @@ export const App = () => {
         ),
     },
   ];
+  const sidebarContent = (
+    <SidebarUtilities
+      onRestoreEntry={handleRestoreEntry}
+      trashEntries={manualData.trash}
+    />
+  );
 
   const headerActions = (
-    <button
-      type="button"
-      onClick={handleExport}
-      className="rounded-xl border border-slate-200 bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
-    >
-      Exportar Manual Actualizado
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={toggleDarkMode}
+        aria-label={
+          manualData.settings.darkMode ? 'Activar modo claro' : 'Activar modo oscuro'
+        }
+        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+      >
+        {manualData.settings.darkMode ? 'Sol' : 'Luna'}
+      </button>
+      <button
+        type="button"
+        onClick={handleExport}
+        className="rounded-xl border border-slate-200 bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:border-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+      >
+        Exportar Manual Actualizado
+      </button>
+    </>
   );
 
   return (
@@ -714,6 +805,7 @@ export const App = () => {
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
         onHomeClick={() => setSearchTerm('')}
+        sidebarContent={sidebarContent}
       >
         <section className="space-y-5 sm:space-y-6">
           {hasSearchTerm ? (
@@ -753,6 +845,7 @@ export const App = () => {
                         categoryColorKey={category?.color}
                         entry={entry}
                         onCommandSave={handleCommandSave}
+                        onDeleteEntry={handleDeleteEntry}
                         onEditEntry={openEditEntryModal}
                       />
                     );

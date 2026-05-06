@@ -23,9 +23,15 @@ export interface CategoryDefinition {
   color: CategoryColorKey;
 }
 
+export interface AppSettings {
+  darkMode: boolean;
+}
+
 export interface ManualData {
   categories: CategoryDefinition[];
   entries: KnowledgeEntry[];
+  settings: AppSettings;
+  trash: KnowledgeEntry[];
 }
 
 export interface CommandOverride {
