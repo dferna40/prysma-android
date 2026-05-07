@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { AppCustomizationSettings } from '../../types';
 
 interface IdentityAccount {
   id: string;
@@ -44,14 +45,18 @@ const copyToClipboard = async (text: string) => {
 
 const maskedValue = '••••••••••••••••••••';
 
-export function IdentityWidget() {
+interface IdentityWidgetProps {
+  customization: AppCustomizationSettings;
+}
+
+export function IdentityWidget({ customization }: IdentityWidgetProps) {
   const [isGlobalRgaVisible, setIsGlobalRgaVisible] = useState(false);
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
-          Escritorio
+          {customization.sidebarIdentityTitle}
         </p>
 
         <section className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
@@ -72,7 +77,7 @@ export function IdentityWidget() {
 
           <div className="mt-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
-              Usuarios por Compania
+              {customization.companyUsersLabel}
             </p>
             <div className="mt-2 space-y-2">
               {identityAccounts.map((account) => (
@@ -108,7 +113,7 @@ export function IdentityWidget() {
       <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-start justify-between gap-3">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
-            Global RGA
+            {customization.globalRgaTitle}
           </p>
           <button
             type="button"
@@ -122,7 +127,7 @@ export function IdentityWidget() {
         <section className="mt-4 space-y-2">
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
-              Usuario
+              {customization.globalUserLabel}
             </p>
             <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-950">
               <span className="truncate rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm font-medium text-slate-800 dark:bg-black dark:text-white">
@@ -148,7 +153,7 @@ export function IdentityWidget() {
 
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
-              Password
+              {customization.globalPasswordLabel}
             </p>
             <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-950">
               <span className="truncate rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm font-medium text-slate-800 dark:bg-black dark:text-white">

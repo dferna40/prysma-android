@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, CSSProperties } from 'react';
+import { AppCustomizationPanel } from './components/settings/AppCustomizationPanel';
 import { MainLayout } from './components/layout/MainLayout';
+import { AppLogo } from './components/ui/AppLogo';
 import { MarkdownRenderer } from './components/ui/MarkdownRenderer';
 import { ResultCard } from './components/ui/ResultCard';
 import { SidebarUtilities } from './components/ui/SidebarUtilities';
+import { defaultAppCustomization, normalizeCustomization } from './constants/appCustomization';
 import {
   categoryColorOptions,
   getCategoryColorHex,
@@ -13,6 +16,7 @@ import manualEntries from './data/manual.json';
 import { useSearch } from './hooks/useSearch';
 import type {
   AppSettings,
+  AppCustomizationSettings,
   CategoryColorKey,
   CategoryDefinition,
   CommandOption,
@@ -27,6 +31,7 @@ const STORAGE_KEY = 'knowledge-manual-state-v2';
 const LEGACY_COMMAND_STORAGE_KEY = 'result-card-command-overrides';
 const ASSISTANT_VERSION = '1.0.0';
 const defaultSettings: AppSettings = {
+  customization: defaultAppCustomization,
   darkMode: false,
 };
 
@@ -296,6 +301,7 @@ const normalizeManualData = (source: unknown): ManualData => {
       settings: {
         ...defaultSettings,
         ...(candidate.settings ?? {}),
+        customization: normalizeCustomization(candidate.settings?.customization),
       },
       templates,
       trash: Array.isArray(candidate.trash)
@@ -317,7 +323,7 @@ const extractManualImportSource = (source: unknown) => {
   if (source && typeof source === 'object' && 'data' in source) {
     const backupCandidate = source as Partial<ManualBackupPayload>;
 
-    if (Array.isArray(backupCandidate.data)) {
+    if (backupCandidate.data) {
       return backupCandidate.data;
     }
   }
@@ -1038,6 +1044,7 @@ export const App = () => {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('');
   const [activeTagFilter, setActiveTagFilter] = useState('');
+  const [activeView, setActiveView] = useState<'home' | 'settings'>('home');
   const [manualData, setManualData] = useState<ManualData>(() =>
     readStoredManualData(),
   );
@@ -1067,6 +1074,7 @@ export const App = () => {
   const [serverHealthState, setServerHealthState] =
     useState<ServerHealthState>('checking');
   const shouldPersistToServerRef = useRef(false);
+  const customization = manualData.settings.customization;
 
   const categoryMap = useMemo(
     () =>
@@ -2780,7 +2788,7 @@ export const App = () => {
       fecha_creacion: new Date().toISOString(),
       total_entradas: manualData.entries.length,
       version_asistente: ASSISTANT_VERSION,
-      data: manualData.entries,
+      data: manualData,
     };
 
     downloadJsonFile(
@@ -2896,12 +2904,34 @@ export const App = () => {
     setDebouncedSearchTerm('');
     setActiveCategoryFilter('');
     setActiveTagFilter('');
+    setActiveView('home');
+  };
+  const handleOpenSettingsView = () => {
+    setActiveView('settings');
+  };
+  const handleSaveCustomization = (
+    nextCustomization: AppCustomizationSettings,
+  ) => {
+    updateManualData((currentManualData) => ({
+      ...currentManualData,
+      settings: {
+        ...currentManualData.settings,
+        customization: normalizeCustomization(nextCustomization),
+      },
+    }));
+    setActiveView('home');
   };
   const handleCategoryFilter = (categoryName: string) => {
+    setActiveView('home');
     setActiveCategoryFilter(categoryName);
   };
   const handleTagFilter = (tag: string) => {
+    setActiveView('home');
     setActiveTagFilter(tag.toLowerCase());
+  };
+  const handleSearchTermChange = (value: string) => {
+    setActiveView('home');
+    setSearchTerm(value);
   };
   // Recordatorio: Si se implementa una lógica Java para la persistencia de estos cambios o el procesado de comandos en el servidor, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos y configuración.
   const toolbarContainerStyle = {
@@ -3068,6 +3098,7 @@ export const App = () => {
   ];
   const sidebarContent = (
     <SidebarUtilities
+      customization={customization}
       onExportBackup={handleExportBackup}
       onExportManual={handleExport}
       onImportBackupClick={handleImportBackupClick}
@@ -3119,6 +3150,31 @@ export const App = () => {
       >
         {saveStatusLabel}
       </div>
+      <button
+        type="button"
+        onClick={handleOpenSettingsView}
+        aria-label="Abrir configuracion general"
+        title="Abrir configuracion general"
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white transition-colors dark:bg-slate-900 ${
+          activeView === 'settings'
+            ? 'border-sky-400/70 text-sky-600 shadow-[0_0_0_4px_rgba(14,165,233,0.12)] dark:border-sky-400/50 dark:text-sky-300'
+            : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white'
+        }`}
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          className="h-5 w-5"
+        >
+          <path
+            d="M10 3.25a1.1 1.1 0 0 1 1.06.81l.2.73a5.9 5.9 0 0 1 1.01.42l.67-.35a1.1 1.1 0 0 1 1.28.21l1.01 1.01a1.1 1.1 0 0 1 .21 1.28l-.35.67c.16.33.3.67.41 1.02l.74.19a1.1 1.1 0 0 1 .81 1.06v1.43a1.1 1.1 0 0 1-.81 1.06l-.74.19a5.8 5.8 0 0 1-.41 1.02l.35.67a1.1 1.1 0 0 1-.21 1.28l-1.01 1.01a1.1 1.1 0 0 1-1.28.21l-.67-.35a5.9 5.9 0 0 1-1.01.42l-.2.73a1.1 1.1 0 0 1-1.06.81H8.57a1.1 1.1 0 0 1-1.06-.81l-.2-.73a5.9 5.9 0 0 1-1.01-.42l-.67.35a1.1 1.1 0 0 1-1.28-.21L3.34 15.7a1.1 1.1 0 0 1-.21-1.28l.35-.67a5.8 5.8 0 0 1-.41-1.02l-.74-.19a1.1 1.1 0 0 1-.81-1.06V9.05a1.1 1.1 0 0 1 .81-1.06l.74-.19c.11-.35.25-.69.41-1.02l-.35-.67a1.1 1.1 0 0 1 .21-1.28l1.01-1.01a1.1 1.1 0 0 1 1.28-.21l.67.35c.32-.17.66-.31 1.01-.42l.2-.73a1.1 1.1 0 0 1 1.06-.81H10Z"
+            stroke="currentColor"
+            strokeWidth="1.2"
+          />
+          <circle cx="10" cy="10.25" r="2.5" stroke="currentColor" strokeWidth="1.2" />
+        </svg>
+      </button>
       <button
       type="button"
       onClick={toggleDarkMode}
@@ -3172,14 +3228,22 @@ export const App = () => {
   return (
     <>
       <MainLayout
+        appName={customization.appName}
+        customization={customization}
         headerActions={headerActions}
         searchTerm={searchTerm}
-        onSearchTermChange={setSearchTerm}
+        onSearchTermChange={handleSearchTermChange}
         onHomeClick={clearAllFilters}
         sidebarContent={sidebarContent}
       >
         <section className="space-y-5 sm:space-y-6">
-          {hasActiveFilters ? (
+          {activeView === 'settings' ? (
+            <AppCustomizationPanel
+              customization={customization}
+              onCancel={() => setActiveView('home')}
+              onSave={handleSaveCustomization}
+            />
+          ) : hasActiveFilters ? (
             <>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -3276,15 +3340,27 @@ export const App = () => {
           ) : (
             <div className="animate-fade-in rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                    Ecosistema de Conocimiento RGA
-                  </h2>
-                  <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
+                <div className="flex items-start gap-4">
+                  <AppLogo
+                    appIconDataUrl={customization.appIconDataUrl}
+                    appName={customization.appName}
+                    className="mt-1 h-14 w-14 shrink-0 sm:h-16 sm:w-16"
+                  />
+                  <div>
+                    <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                      {customization.heroTitle}
+                    </h2>
+                    <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
+                      {customization.heroDescription}
+                    </p>
+                    <div className="hidden">
+                      <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
                     Tu centro de conocimiento inteligente: Organiza guías de
                     trabajo, revisa el estado de tus sistemas y genera manuales
                     profesionales listos para compartir.
-                  </p>
+                    </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -3341,9 +3417,7 @@ export const App = () => {
                   *
                 </span>
                 <p className="font-medium leading-6">
-                  Recordatorio: Para cualquier implementacion Java que gestione
-                  excepciones, utiliza siempre <code>try-catch-resources</code>{' '}
-                  para garantizar la seguridad del codigo.
+                  Recordatorio: {customization.reminderText}
                 </p>
               </div>
 

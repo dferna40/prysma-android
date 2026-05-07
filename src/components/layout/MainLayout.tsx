@@ -1,54 +1,9 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { AppLogo } from '../ui/AppLogo';
 import { IdentityWidget } from '../ui/IdentityWidget';
 import { SearchBar } from '../ui/SearchBar';
-
-const externalTools = [
-  { name: 'Jira Indra', url: 'https://jira.indra.es/secure/Dashboard.jspa' },
-  {
-    name: 'iTeams',
-    url: 'http://10.22.206.214:8180/ione-gestion-configuracion/CULogin/LoginAceptar.do?&SESSION_CLIENT_STATE=1777993003974#',
-  },
-  {
-    name: 'Escritorio Onesait Local',
-    url: 'http://localhost.npa.com:8080/npa-escritorio',
-  },
-  {
-    name: 'Escritorio Onesait INT1',
-    url: 'https://acdc-int1.caja.rural:8543/npa-escritorio',
-  },
-  {
-    name: 'Escritorio Onesait INT2',
-    url: 'https://acdc-int2.caja.rural:8543/npa-escritorio',
-  },
-  {
-    name: 'Escritorio Onesait UAT',
-    url: 'https://acdc-uat.caja.rural:8643/npa-escritorio',
-  },
-  {
-    name: 'Escritorio Onesait PRE',
-    url: 'https://acdc-pre.caja.rural:8443/npa-escritorio',
-  },
-  {
-    name: 'Correo corporativo Indra',
-    url: 'https://outlook.cloud.microsoft/mail/',
-  },
-  {
-    name: 'Correo corporativo Keapps',
-    url: 'https://serviciodecorreo.es/?_task=mail&_mbox=INBOX',
-  },
-  { name: 'Word 365', url: 'https://word.cloud.microsoft/' },
-  {
-    name: 'Excel 365',
-    url: 'https://excel.cloud.microsoft/?wdOrigin=OFFICECOM-WEB.APPGALLERY',
-  },
-  {
-    name: 'Cezanne Keapps',
-    url: 'https://w3.cezanneondemand.com/CezanneHR/-/KEAPPS/view/9ebaad0a-8ad5-4d97-b2f1-e5d179149a81?ce=3&et=4d8970cb-6164-4162-b780-4574ff852be1&n=6c5063b4-8307-4f55-b968-ddc3e36e154d',
-  },
-  { name: 'Wiki Onesait general', url: '#' },
-  { name: 'Wiki Onesait 5.0', url: '#' },
-];
+import type { AppCustomizationSettings } from '../../types';
 
 // Recordatorio: Si en el futuro se implementa una logica Java para la gestion dinamica de estos enlaces (por ejemplo, cargandolos desde una base de datos), es obligatorio utilizar try-catch-resources para el cierre seguro de los flujos de datos.
 
@@ -57,6 +12,8 @@ const externalTools = [
 // seguridad y el cierre de conexiones.
 
 interface MainLayoutProps {
+  appName: string;
+  customization: AppCustomizationSettings;
   children: ReactNode;
   headerActions?: ReactNode;
   topBarContent?: ReactNode;
@@ -67,6 +24,8 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({
+  appName,
+  customization,
   children,
   headerActions,
   topBarContent,
@@ -90,11 +49,11 @@ export function MainLayout({
   const defaultSidebarContent = (
     <div>
       <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">
-        Herramientas Externas
+        {customization.externalToolsTitle}
       </p>
       <nav aria-label="Herramientas externas">
         <ul className="app-scrollbar max-h-72 space-y-1 overflow-y-auto pr-1">
-          {externalTools.map((tool) => (
+          {customization.externalTools.map((tool) => (
             <li key={tool.name}>
               <a
                 href={tool.url}
@@ -121,7 +80,7 @@ export function MainLayout({
   const mobileSidebarPanel = (
     <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto">
       <div className="bg-slate-50/85 p-4 backdrop-blur supports-[backdrop-filter]:bg-slate-50/70 dark:bg-slate-900/80 dark:supports-[backdrop-filter]:bg-slate-900/70">
-        <IdentityWidget />
+        <IdentityWidget customization={customization} />
       </div>
 
       <div className="app-scrollbar border-t border-slate-100 p-4 dark:border-slate-800">
@@ -136,7 +95,7 @@ export function MainLayout({
   const desktopSidebarPanel = (
     <div className="flex flex-col">
       <div className="bg-slate-50/85 p-4 backdrop-blur supports-[backdrop-filter]:bg-slate-50/70 dark:bg-slate-900/80 dark:supports-[backdrop-filter]:bg-slate-900/70">
-        <IdentityWidget />
+        <IdentityWidget customization={customization} />
       </div>
 
       <div className="app-scrollbar border-t border-slate-100 p-4 dark:border-slate-800">
@@ -199,9 +158,14 @@ export function MainLayout({
                   <button
                     type="button"
                     onClick={handleHomeNavigation}
-                    className="cursor-pointer text-left text-sm font-semibold text-slate-900 transition-all duration-200 hover:text-sky-700 dark:text-slate-100 sm:text-base md:text-lg"
+                    className="flex min-w-0 items-center gap-3 text-left text-sm font-semibold text-slate-900 transition-all duration-200 hover:text-sky-700 dark:text-slate-100 sm:text-base md:text-lg"
                   >
-                    Asistente Onesite RGA
+                    <AppLogo
+                      appIconDataUrl={customization.appIconDataUrl}
+                      appName={appName}
+                      className="h-10 w-10 shrink-0"
+                    />
+                    <span className="truncate">{appName}</span>
                   </button>
                   <div className="min-w-0 flex-1">
                     <SearchBar

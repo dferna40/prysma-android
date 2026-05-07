@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import type { KnowledgeEntry } from '../../types';
+import type { AppCustomizationSettings, KnowledgeEntry } from '../../types';
 
 interface SidebarUtilitiesProps {
+  customization: AppCustomizationSettings;
   onExportBackup: () => void;
   onExportManual: () => void;
   onImportBackupClick: () => void;
@@ -69,6 +70,7 @@ const formatSqlInput = (rawValue: string) => {
 };
 
 export function SidebarUtilities({
+  customization,
   onExportBackup,
   onExportManual,
   onImportBackupClick,
@@ -110,7 +112,7 @@ export function SidebarUtilities({
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-200">
-              DevTools
+              {customization.devToolsSectionTitle}
             </h3>
           </div>
 
@@ -181,7 +183,7 @@ export function SidebarUtilities({
 
         <section className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
           <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-200">
-            Backup
+            {customization.backupSectionTitle}
           </h3>
           <div className="mt-3 grid gap-2">
             <button
@@ -242,7 +244,7 @@ export function SidebarUtilities({
                     : 'text-slate-400 dark:text-slate-500'
                 }`}
               >
-                Papelera
+                {customization.trashSectionTitle}
               </h3>
             </div>
             <span

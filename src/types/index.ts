@@ -23,7 +23,32 @@ export interface CategoryDefinition {
   color: CategoryColorKey;
 }
 
+export interface ExternalToolLink {
+  id: string;
+  name: string;
+  url: string;
+}
+
+export interface AppCustomizationSettings {
+  appIconDataUrl: string;
+  appName: string;
+  backupSectionTitle: string;
+  companyUsersLabel: string;
+  devToolsSectionTitle: string;
+  externalTools: ExternalToolLink[];
+  externalToolsTitle: string;
+  globalPasswordLabel: string;
+  globalRgaTitle: string;
+  globalUserLabel: string;
+  heroDescription: string;
+  heroTitle: string;
+  reminderText: string;
+  sidebarIdentityTitle: string;
+  trashSectionTitle: string;
+}
+
 export interface AppSettings {
+  customization: AppCustomizationSettings;
   darkMode: boolean;
 }
 
@@ -48,7 +73,7 @@ export interface ManualData {
 }
 
 export interface ManualBackupPayload {
-  data: KnowledgeEntry[];
+  data: ManualData | KnowledgeEntry[];
   fecha_creacion: string;
   total_entradas: number;
   version_asistente: string;
