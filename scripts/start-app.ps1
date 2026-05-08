@@ -6,13 +6,23 @@ $logsDir = Join-Path $runtimeDir 'logs'
 $serverPidPath = Join-Path $runtimeDir 'server.pid'
 $serverLogPath = Join-Path $logsDir 'server.stdout.log'
 $serverErrorLogPath = Join-Path $logsDir 'server.stderr.log'
+$launcherLogPath = Join-Path $logsDir 'launcher.log'
 $distIndexPath = Join-Path $projectRoot 'dist\index.html'
 $appUrl = 'http://127.0.0.1:3001'
 $serverUrl = 'http://127.0.0.1:3001/health'
+$nodeExecutable = (Get-Command node -ErrorAction Stop).Source
 
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
 Add-Type -AssemblyName PresentationFramework
+
+function Write-LauncherLog {
+  param(
+    [string]$Message
+  )
+
+  Add-Content -LiteralPath $launcherLogPath -Value "[$([DateTime]::Now.ToString('s'))] $Message"
+}
 
 if (-not (Test-Path -LiteralPath $distIndexPath)) {
   [System.Windows.MessageBox]::Show(
@@ -79,6 +89,34 @@ function Test-ProcessAlive {
   }
 }
 
+function Open-AppInDefaultBrowser {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Url
+  )
+
+  try {
+    Start-Process -FilePath 'explorer.exe' -ArgumentList $Url | Out-Null
+    Write-LauncherLog "URL abierta con explorer.exe: $Url"
+    return $true
+  } catch {
+    try {
+      Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'start', '', $Url -WindowStyle Hidden | Out-Null
+      Write-LauncherLog "URL abierta con cmd/start: $Url"
+      return $true
+    } catch {
+      try {
+        Start-Process $Url | Out-Null
+        Write-LauncherLog "URL abierta con Start-Process directo: $Url"
+        return $true
+      } catch {
+        Write-LauncherLog "No se pudo abrir automaticamente la URL: $Url"
+        return $false
+      }
+    }
+  }
+}
+
 function Get-ListeningProcessIdForPort {
   param(
     [int]$Port
@@ -130,25 +168,41 @@ function Start-HiddenProcess {
     }
   }
 
-  $escapedProjectRoot = $projectRoot.Replace('"', '""')
-  $escapedStdOutLog = $StandardOutputLogPath.Replace('"', '""')
-  $escapedStdErrLog = $StandardErrorLogPath.Replace('"', '""')
-  $command = 'set "APP_PORT=3001" && set "APP_SERVE_STATIC=true" && start "" /b node server.js 1>> "' + $escapedStdOutLog + '" 2>> "' + $escapedStdErrLog + '"'
   $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-  $startInfo.FileName = 'cmd.exe'
-  $startInfo.Arguments = "/d /c ""cd /d """"$escapedProjectRoot"""" && $command"""
+  $startInfo.FileName = $nodeExecutable
+  $startInfo.Arguments = 'server.js'
   $startInfo.WorkingDirectory = $projectRoot
   $startInfo.UseShellExecute = $false
   $startInfo.CreateNoWindow = $true
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $startInfo.EnvironmentVariables['APP_PORT'] = '3001'
+  $startInfo.EnvironmentVariables['APP_SERVE_STATIC'] = 'true'
 
   $process = New-Object System.Diagnostics.Process
   $process.StartInfo = $startInfo
   $process.Start() | Out-Null
+  $process.BeginOutputReadLine()
+  $process.BeginErrorReadLine()
+  $process.add_OutputDataReceived({
+    param($sender, $eventArgs)
+    if ($eventArgs.Data) {
+      Add-Content -LiteralPath $StandardOutputLogPath -Value $eventArgs.Data
+    }
+  })
+  $process.add_ErrorDataReceived({
+    param($sender, $eventArgs)
+    if ($eventArgs.Data) {
+      Add-Content -LiteralPath $StandardErrorLogPath -Value $eventArgs.Data
+    }
+  })
+  Write-LauncherLog "Servidor lanzado con PID inicial $($process.Id)"
 
   for ($attempt = 0; $attempt -lt 15; $attempt++) {
     $listeningProcessId = Get-ListeningProcessIdForPort -Port 3001
     if ($listeningProcessId) {
       Set-Content -LiteralPath $PidFile -Value $listeningProcessId -Encoding ASCII
+      Write-LauncherLog "Servidor escuchando en 3001 con PID $listeningProcessId"
       return
     }
 
@@ -156,9 +210,11 @@ function Start-HiddenProcess {
   }
 
   Set-Content -LiteralPath $PidFile -Value $process.Id -Encoding ASCII
+  Write-LauncherLog "No se detecto el puerto a tiempo; se guarda PID de proceso $($process.Id)"
 }
 
 if (-not (Test-PortReady -Url $serverUrl)) {
+  Write-LauncherLog 'El servidor no estaba listo. Se inicia una nueva instancia.'
   Start-HiddenProcess `
     -PidFile $serverPidPath `
     -StandardOutputLogPath $serverLogPath `
@@ -168,8 +224,19 @@ if (-not (Test-PortReady -Url $serverUrl)) {
 $maxAttempts = 45
 for ($attempt = 0; $attempt -lt $maxAttempts; $attempt++) {
   if ((Test-PortReady -Url $serverUrl) -and (Test-UrlReachable -Url $appUrl)) {
-    Start-Process $appUrl
-    exit 0
+    if (Open-AppInDefaultBrowser -Url $appUrl) {
+      Write-LauncherLog 'Arranque web completado correctamente.'
+      exit 0
+    }
+
+    [System.Windows.MessageBox]::Show(
+      "La aplicacion ha arrancado, pero no se ha podido abrir el navegador automaticamente.`n`nAbre manualmente esta URL:`n$appUrl",
+      'Asistente de Conocimiento',
+      'OK',
+      'Warning'
+    ) | Out-Null
+    Write-LauncherLog 'Arranque web con apertura automatica fallida.'
+    exit 1
   }
 
   Start-Sleep -Milliseconds 750
@@ -181,5 +248,7 @@ for ($attempt = 0; $attempt -lt $maxAttempts; $attempt++) {
   'OK',
   'Warning'
 ) | Out-Null
+
+Write-LauncherLog 'La aplicacion no arranco a tiempo.'
 
 exit 1

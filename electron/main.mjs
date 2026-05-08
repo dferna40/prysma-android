@@ -1,9 +1,14 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, shell } from 'electron';
 import { startServer } from '../server.js';
 
-const desktopPort = Number(process.env.APP_PORT || 3001);
+const currentFilePath = fileURLToPath(import.meta.url);
+const electronRoot = path.dirname(currentFilePath);
+const projectRoot = path.resolve(electronRoot, '..');
+const desktopUserDataPath = path.join(projectRoot, '.runtime', 'electron-userdata');
+const desktopPort = Number(process.env.ELECTRON_APP_PORT || 3002);
 const devServerUrl = process.env.ELECTRON_START_URL || '';
 
 let mainWindow = null;
@@ -13,6 +18,9 @@ app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('no-sandbox');
+
+fs.mkdirSync(desktopUserDataPath, { recursive: true });
+app.setPath('userData', desktopUserDataPath);
 
 const logDesktopEvent = (message, details) => {
   try {
@@ -30,11 +38,12 @@ const createMainWindow = async () => {
   mainWindow = new BrowserWindow({
     autoHideMenuBar: true,
     backgroundColor: '#0f172a',
+    center: true,
     height: 960,
-    icon: path.join(app.getAppPath(), 'build-assets', 'icon.ico'),
+    icon: path.join(projectRoot, 'build-assets', 'icon.ico'),
     minHeight: 760,
     minWidth: 1200,
-    show: false,
+    show: true,
     width: 1480,
     webPreferences: {
       contextIsolation: true,
@@ -46,6 +55,12 @@ const createMainWindow = async () => {
   mainWindow.once('ready-to-show', () => {
     logDesktopEvent('Ventana lista para mostrarse.');
     mainWindow?.show();
+    mainWindow?.focus();
+    mainWindow?.moveTop();
+    mainWindow?.setAlwaysOnTop(true);
+    setTimeout(() => {
+      mainWindow?.setAlwaysOnTop(false);
+    }, 1500);
   });
 
   mainWindow.on('closed', () => {
@@ -88,19 +103,21 @@ const ensureDesktopServer = async () => {
     appDataDir: app.getPath('userData'),
     port: desktopPort,
     serveStatic: true,
-    sourceRoot: app.getAppPath(),
-    staticDistDir: path.join(app.getAppPath(), 'dist'),
+    sourceRoot: projectRoot,
+    staticDistDir: path.join(projectRoot, 'dist'),
   });
 };
 
 const shutdownDesktopServer = async () => {
   if (!serverHandle?.server) {
+    logDesktopEvent('No hay servidor embebido que cerrar.');
     return;
   }
 
   await new Promise((resolve) => {
     serverHandle.server.close(() => resolve(undefined));
   });
+  logDesktopEvent('Servidor embebido detenido.');
   serverHandle = null;
 };
 
@@ -111,6 +128,9 @@ if (!singleInstanceLock) {
 } else {
   app.on('second-instance', () => {
     if (!mainWindow) {
+      if (app.isReady()) {
+        void createMainWindow();
+      }
       return;
     }
 
@@ -135,17 +155,40 @@ if (!singleInstanceLock) {
       }
     });
   }).catch((error) => {
+    logDesktopEvent('Fallo durante el bootstrap de Electron.', {
+      message: error?.message,
+      stack: error?.stack,
+    });
     console.error('No se pudo iniciar la app de escritorio.', error);
     app.quit();
   });
 
   app.on('before-quit', () => {
+    logDesktopEvent('Evento before-quit recibido.');
     void shutdownDesktopServer();
   });
 
   app.on('window-all-closed', () => {
+    logDesktopEvent('Evento window-all-closed recibido.');
     if (process.platform !== 'darwin') {
       app.quit();
     }
+  });
+
+  app.on('quit', (_event, exitCode) => {
+    logDesktopEvent('Electron finalizado.', { exitCode });
+  });
+
+  process.on('uncaughtException', (error) => {
+    logDesktopEvent('Excepcion no controlada en el proceso principal.', {
+      message: error?.message,
+      stack: error?.stack,
+    });
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    logDesktopEvent('Promesa no controlada en el proceso principal.', {
+      reason: typeof reason === 'string' ? reason : JSON.stringify(reason),
+    });
   });
 }

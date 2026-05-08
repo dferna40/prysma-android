@@ -136,13 +136,14 @@ const normalizeEndpointTarget = (value) => {
 };
 
 export const startServer = async ({
-  allowedOrigins = createAllowedOrigins(defaultPort),
+  allowedOrigins,
   appDataDir,
   port = defaultPort,
   serveStatic = false,
   sourceRoot = projectRoot,
   staticDistDir,
 } = {}) => {
+  const resolvedAllowedOrigins = allowedOrigins ?? createAllowedOrigins(port);
   const runtimePaths = resolveRuntimePaths({
     appDataDir,
     sourceRoot,
@@ -168,7 +169,7 @@ export const startServer = async ({
   app.use(
     cors({
       origin: (origin, callback) => {
-        if (!origin || origin === 'null' || allowedOrigins.has(origin)) {
+        if (!origin || origin === 'null' || resolvedAllowedOrigins.has(origin)) {
           callback(null, true);
           return;
         }
@@ -419,7 +420,7 @@ export const startServer = async ({
       server.ref();
 
       logServerEvent('BOOT', 'Servidor de imagenes y persistencia iniciado.', {
-        allowedOrigins: Array.from(allowedOrigins),
+        allowedOrigins: Array.from(resolvedAllowedOrigins),
         backupsDirectory: runtimePaths.backupsDirectory,
         imagesDirectory: runtimePaths.imagesDirectory,
         manualFilePath: runtimePaths.manualFilePath,

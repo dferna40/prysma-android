@@ -52,5 +52,28 @@ function Stop-FromPort {
   }
 }
 
+function Stop-ProjectElectronProcesses {
+  param(
+    [string]$ProjectRoot
+  )
+
+  $normalizedProjectRoot = $ProjectRoot.ToLowerInvariant()
+  $electronProcesses = Get-CimInstance Win32_Process -Filter "name = 'electron.exe'"
+
+  foreach ($process in $electronProcesses) {
+    $commandLine = $process.CommandLine
+
+    if (-not $commandLine) {
+      continue
+    }
+
+    if ($commandLine.ToLowerInvariant().Contains($normalizedProjectRoot)) {
+      Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
 Stop-FromPidFile -PidFile $serverPidPath
 Stop-FromPort -Port 3001
+Stop-FromPort -Port 3002
+Stop-ProjectElectronProcesses -ProjectRoot $projectRoot

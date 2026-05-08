@@ -1,25 +1,25 @@
 # Asistente Onesait
 
-Aplicación de escritorio y web para centralizar conocimiento operativo de trabajo: entornos, accesos, procedimientos, comandos, plantillas y documentación técnica en formato Markdown.
+Aplicacion local de apoyo al trabajo diario para centralizar conocimiento operativo: entornos, accesos, procedimientos, comandos, plantillas y documentacion tecnica en Markdown.
 
-Su objetivo es servir como base de conocimiento local y práctica para el día a día, con foco en consulta rápida, edición sencilla, exportación y persistencia controlada.
+Su objetivo es ofrecer una base de conocimiento practica, editable y persistente, pensada para consulta rapida y uso cotidiano en Windows.
 
-## Qué es este proyecto
+## Vision general
 
 El proyecto combina:
 
-- una interfaz `React + Vite` para consultar y editar contenido
-- un servidor `Express` para persistencia, backups, subida de imágenes y comprobaciones auxiliares
+- un frontend `React + Vite`
+- un backend local `Express`
 - una variante de escritorio con `Electron`
-- scripts de arranque/cierre para uso diario en Windows
+- scripts de arranque y cierre para uso diario
 
-La aplicación puede ejecutarse de tres formas:
+La aplicacion puede usarse de tres maneras:
 
-1. como aplicación web en desarrollo
-2. como aplicación web compilada abierta desde el navegador
-3. como aplicación de escritorio Electron
+1. desarrollo web con recarga en caliente
+2. modo web compilado en el navegador predeterminado
+3. modo escritorio con `Electron`
 
-## Tecnologías usadas
+## Tecnologias usadas
 
 - `React 18`
 - `TypeScript`
@@ -27,23 +27,27 @@ La aplicación puede ejecutarse de tres formas:
 - `Tailwind CSS`
 - `Express`
 - `Electron`
-- `multer` para subida de imágenes
-- `react-markdown`, `remark-gfm`, `rehype-highlight`, `highlight.js` para renderizado de Markdown
-- `jspdf` y `html2canvas` para exportación a PDF
+- `multer`
+- `react-markdown`
+- `remark-gfm`
+- `rehype-highlight`
+- `highlight.js`
+- `jspdf`
+- `html2canvas`
 
 ## Estructura principal
 
-- [src/App.tsx](C:/Desarrollo/asistenteOnesait/src/App.tsx): lógica principal de la aplicación
-- [src/components](C:/Desarrollo/asistenteOnesait/src/components): componentes de UI y paneles
-- [src/hooks/useSearch.ts](C:/Desarrollo/asistenteOnesait/src/hooks/useSearch.ts): motor de búsqueda y prefijos
-- [src/types/index.ts](C:/Desarrollo/asistenteOnesait/src/types/index.ts): tipos de dominio
-- [src/data/manual.json](C:/Desarrollo/asistenteOnesait/src/data/manual.json): base inicial del manual
-- [server.js](C:/Desarrollo/asistenteOnesait/server.js): servidor local de persistencia y utilidades
-- [electron/main.mjs](C:/Desarrollo/asistenteOnesait/electron/main.mjs): bootstrap de escritorio
-- [scripts/start-app.ps1](C:/Desarrollo/asistenteOnesait/scripts/start-app.ps1): arranque de la versión compilada en navegador
-- [scripts/stop-app.ps1](C:/Desarrollo/asistenteOnesait/scripts/stop-app.ps1): cierre del servidor local
-- [Abrir Asistente.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente.vbs): acceso silencioso de arranque
-- [Cerrar Asistente.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente.vbs): acceso silencioso de cierre
+- [src/App.tsx](C:/Desarrollo/asistenteOnesait/src/App.tsx): logica principal de la aplicacion
+- [src/main.tsx](C:/Desarrollo/asistenteOnesait/src/main.tsx): bootstrap del frontend y captura de errores de render
+- [src/components](C:/Desarrollo/asistenteOnesait/src/components): componentes y paneles
+- [src/hooks/useSearch.ts](C:/Desarrollo/asistenteOnesait/src/hooks/useSearch.ts): busqueda, prefijos y filtros
+- [src/types/index.ts](C:/Desarrollo/asistenteOnesait/src/types/index.ts): tipos del dominio
+- [src/data/manual.json](C:/Desarrollo/asistenteOnesait/src/data/manual.json): manual base inicial
+- [server.js](C:/Desarrollo/asistenteOnesait/server.js): persistencia, backups, subida de imagenes y comprobaciones
+- [electron/main.mjs](C:/Desarrollo/asistenteOnesait/electron/main.mjs): arranque de la variante Electron
+- [scripts/start-app.ps1](C:/Desarrollo/asistenteOnesait/scripts/start-app.ps1): arranque del modo web compilado
+- [scripts/start-electron.ps1](C:/Desarrollo/asistenteOnesait/scripts/start-electron.ps1): arranque del modo Electron
+- [scripts/stop-app.ps1](C:/Desarrollo/asistenteOnesait/scripts/stop-app.ps1): cierre de servidores e instancias locales
 
 ## Requisitos
 
@@ -51,14 +55,15 @@ Para desarrollo:
 
 - `Node.js` 18 o superior
 - `npm`
-- Windows con PowerShell, si vas a usar los scripts `.ps1`, `.cmd` o `.vbs`
+- Windows con PowerShell
 
-Para uso como escritorio:
+Para uso diario:
 
 - Windows
 - dependencias instaladas con `npm install`
+- frontend compilado con `npm run build` si vas a usar el modo web compilado o Electron local
 
-## Instalación
+## Instalacion
 
 ### Primera vez
 
@@ -70,223 +75,133 @@ Para uso como escritorio:
 npm install
 ```
 
-### Después de instalar
-
-Ya puedes usar cualquiera de estas variantes:
-
-- modo desarrollo web
-- modo compilado con navegador
-- modo escritorio Electron
-
-## Formas de arrancar la aplicación
-
-### Opción 1: desarrollo web
-
-Levanta Vite y el servidor local a la vez.
-
-```powershell
-npm run dev
-```
-
-Qué hace:
-
-- Vite sirve el frontend en `http://localhost:5173`
-- el servidor Express se levanta en `http://127.0.0.1:3001`
-
-Uso recomendado:
-
-- cuando estés desarrollando
-- cuando quieras ver cambios al momento
-- cuando necesites depurar frontend o backend
-
-Cómo abrir:
-
-- entra en `http://localhost:5173`
-
-Cómo cerrar:
-
-- detén la terminal con `Ctrl + C`
-
-### Opción 2: versión web compilada con navegador
-
-Esta es la opción pensada para uso diario sin abrir una terminal manualmente.
-
-Antes de usarla por primera vez, compila el frontend:
+4. Compila el frontend:
 
 ```powershell
 npm run build
 ```
 
-Después puedes arrancar con cualquiera de estos accesos:
+Con eso ya puedes usar cualquiera de los modos de arranque.
+
+## Formas de arrancar la aplicacion
+
+### 1. Desarrollo web
+
+```powershell
+npm run dev
+```
+
+Que hace:
+
+- levanta Vite en `http://localhost:5173`
+- levanta el backend en `http://127.0.0.1:3001`
+
+Uso recomendado:
+
+- desarrollo diario
+- cambios de frontend o backend
+- depuracion
+
+Como cerrar:
+
+- `Ctrl + C` en la terminal
+
+### 2. Web compilada en navegador
+
+Arranque recomendado para uso diario en navegador:
 
 - [Abrir Asistente.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente.vbs)
 - [Abrir Asistente.cmd](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente.cmd)
 
-Qué hace:
+Que hace:
 
 - comprueba que exista `dist/index.html`
-- arranca el servidor local en segundo plano en el puerto `3001`
+- arranca el backend en segundo plano en `3001`
 - espera a que la app responda
-- abre `http://127.0.0.1:3001`
+- abre `http://127.0.0.1:3001` en el navegador predeterminado
 
-Uso recomendado:
-
-- cuando quieras usar la aplicación en navegador sin consola visible
-- cuando no necesites hot reload
-
-Cómo cerrar correctamente:
+Como cerrar correctamente:
 
 - [Cerrar Asistente.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente.vbs)
 - [Cerrar Asistente.cmd](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente.cmd)
 
 Importante:
 
-- si solo cierras la ventana del navegador, el backend puede quedarse vivo en segundo plano
-- para evitar instancias antiguas o puertos ocupados, cierra siempre con los scripts de cierre
+- si cierras solo la ventana o la pestana del navegador, el backend puede quedarse vivo
+- para evitar puertos ocupados o instancias antiguas, usa siempre los scripts de cierre
 
-### Opción 3: escritorio Electron en desarrollo
+### 3. Electron local
 
-Primero levanta el frontend de Vite:
+Para pruebas tecnicas puedes lanzarlo con:
+
+```powershell
+npm run desktop
+```
+
+Pero para uso normal en Windows se recomienda:
+
+- [Abrir Asistente Electron.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente%20Electron.vbs)
+- [Abrir Asistente Electron.cmd](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente%20Electron.cmd)
+
+Que hace:
+
+- limpia restos de instancias previas
+- arranca Electron contra la build local
+- usa un servidor embebido en `http://127.0.0.1:3002`
+
+Como cerrar correctamente:
+
+- [Cerrar Asistente Electron.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente%20Electron.vbs)
+- [Cerrar Asistente Electron.cmd](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente%20Electron.cmd)
+
+Importante:
+
+- no mezcles el modo navegador y Electron a la vez
+- el modo navegador usa `3001`
+- Electron usa `3002`
+
+### 4. Electron usando Vite en desarrollo
+
+Si quieres probar Electron contra el frontend en caliente:
+
+1. En una terminal:
 
 ```powershell
 npm run vite-dev
 ```
 
-Luego, en otra terminal:
+2. En otra terminal:
 
 ```powershell
 $env:ELECTRON_START_URL="http://localhost:5173"
 npm run desktop
 ```
 
-Qué hace:
+## Flujo recomendado de uso
 
-- Electron abre una ventana nativa
-- reutiliza el frontend servido por Vite
-- no arranca el servidor embebido si detecta `ELECTRON_START_URL`
+### Uso diario en navegador
 
-Uso recomendado:
+1. Ejecuta [Abrir Asistente.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente.vbs)
+2. Trabaja normalmente
+3. Cierra con [Cerrar Asistente.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente.vbs)
 
-- cuando quieras probar la experiencia de escritorio sin empaquetar
+### Uso diario en escritorio
 
-### Opción 4: escritorio empaquetado
+1. Ejecuta [Abrir Asistente Electron.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente%20Electron.vbs)
+2. Trabaja normalmente
+3. Cierra con [Cerrar Asistente Electron.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente%20Electron.vbs)
 
-Para generar una build de escritorio:
+### Cuando cambies codigo
 
-```powershell
-npm run desktop:build
-```
+1. Usa `npm run dev`
+2. Cuando quieras volver a modo compilado, ejecuta `npm run build`
+3. Reabre con el lanzador que corresponda
 
-Para generar la variante portable de Windows:
-
-```powershell
-npm run desktop:portable
-```
-
-Salida habitual:
-
-- carpeta `release/`
-
-Importante:
-
-- los artefactos de `release/`, `release-fixed/` y `release-icon/` no deben subirse al repositorio
-
-## Qué hacer la primera vez y qué hacer en usos futuros
-
-### Primera vez para un usuario técnico
-
-1. `npm install`
-2. `npm run build`
-3. arranca con [Abrir Asistente.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente.vbs)
-4. cierra con [Cerrar Asistente.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente.vbs)
-
-### Uso habitual diario
-
-1. ejecuta [Abrir Asistente.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente.vbs)
-2. trabaja normalmente
-3. cierra con [Cerrar Asistente.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente.vbs)
-
-### Cuando cambies código
-
-1. usa `npm run dev` si estás desarrollando
-2. cuando quieras pasar al modo compilado, ejecuta `npm run build`
-3. vuelve a abrir con `Abrir Asistente.vbs`
-
-## Arquitectura funcional
+## Arquitectura
 
 ### Frontend
 
-El frontend mantiene el estado del manual completo:
-
-- secciones
-- fichas
-- plantillas
-- papelera
-- ajustes
-
-Responsabilidades principales:
-
-- navegación y filtros
-- edición de fichas, secciones y plantillas
-- vistas rápidas
-- papelera
-- exportación e importación
-- estados de sincronización y diagnóstico
-
-### Backend
-
-El backend local en [server.js](C:/Desarrollo/asistenteOnesait/server.js) se encarga de:
-
-- leer el manual desde disco
-- guardar el manual completo
-- crear backups previos al guardado
-- servir imágenes subidas
-- comprobar endpoints
-- detectar conflictos de guardado entre instancias
-
-### Persistencia
-
-La persistencia sigue este esquema:
-
-1. la fuente principal es el manual en disco gestionado por el servidor
-2. `localStorage` se usa como apoyo local de sesión
-3. si falla el servidor, la aplicación puede seguir temporalmente en local
-
-Estados importantes que verás en la UI:
-
-- `Cargado desde disco`
-- `Recuperado desde guardado local`
-- `Cambios aún no sincronizados`
-- `Conflicto de guardado`
-
-### Variante de escritorio
-
-La variante Electron:
-
-- abre una `BrowserWindow`
-- puede arrancar un servidor embebido
-- guarda datos de ejecución bajo `app.getPath('userData')`
-- carga la versión compilada del frontend desde `dist`
-
-## Endpoints del servidor
-
-El backend expone estos endpoints principales:
-
-- `GET /health`
-  - comprueba que el servidor está vivo
-- `GET /manual`
-  - devuelve el manual actual y su revisión
-- `POST /save-manual`
-  - guarda el manual completo
-  - incluye control de revisión para detectar conflictos entre instancias
-- `GET /check-endpoint`
-  - valida disponibilidad de URLs o hosts desde el servidor
-- `POST /upload`
-  - sube imágenes para incrustarlas en contenido Markdown
-
-## Modelo de datos
-
-La aplicación trabaja con un objeto `ManualData` que contiene:
+El frontend mantiene un `ManualData` completo con:
 
 - `categories`
 - `entries`
@@ -295,60 +210,92 @@ La aplicación trabaja con un objeto `ManualData` que contiene:
 - `settings`
 - `deletedCategories`
 
-Esto permite:
+Responsabilidades principales:
 
-- restaurar secciones borradas
-- mantener plantillas y papelera
-- guardar personalización y modo oscuro
+- busqueda
+- filtros y vistas rapidas
+- edicion de fichas, secciones y plantillas
+- importacion y exportacion
+- papelera
+- estados de guardado
+- diagnostico visual
+
+### Backend
+
+El backend local en [server.js](C:/Desarrollo/asistenteOnesait/server.js) se encarga de:
+
+- leer el manual desde disco
+- guardar el manual completo
+- crear backups previos al guardado
+- servir imagenes subidas
+- validar endpoints
+- detectar conflictos de guardado entre instancias
+
+### Persistencia
+
+La persistencia sigue este esquema:
+
+1. la fuente principal es el manual gestionado por el servidor
+2. `localStorage` actua como apoyo local
+3. si el servidor falla, la app puede seguir temporalmente en local
+
+Estados habituales en la UI:
+
+- `Cargado desde disco`
+- `Recuperado desde guardado local`
+- `Cambios aun no sincronizados`
+- `Conflicto de guardado`
+
+### Electron
+
+La variante Electron:
+
+- crea una `BrowserWindow`
+- arranca un servidor embebido local
+- guarda su runtime en `.runtime/electron-userdata`
+- sirve la build de `dist`
+- usa el puerto `3002`
+
+## Endpoints principales
+
+- `GET /health`
+- `GET /manual`
+- `POST /save-manual`
+- `GET /check-endpoint`
+- `POST /upload`
 
 ## Funcionalidades principales
 
-### 1. Inicio y navegación
-
-La pantalla principal muestra:
+### Inicio y navegacion
 
 - hero principal
-- acceso al buscador
+- buscador operativo
 - secciones
-- estadísticas
-- plantillas
+- tarjetas resumen
+- accesos rapidos
 - utilidades laterales
 
-También hay vistas rápidas para:
-
-- `Entorno`
-- `Credenciales`
-- `Incidencias`
-- `Ancladas`
-
-### 2. Gestión de secciones
-
-Puedes:
+### Secciones
 
 - crear secciones
-- editar nombre, color y descripción
+- editar nombre, color y descripcion
 - borrar secciones
-- restaurarlas desde la papelera
+- restaurar secciones desde la papelera
 
-Al borrar una sección:
+### Fichas
 
-- sus fichas van a la papelera
-- la metadata de la sección se conserva para poder restaurarla bien
+Cada ficha puede incluir:
 
-### 3. Gestión de fichas
-
-Cada ficha puede contener:
-
-- título
-- categoría
+- titulo
+- categoria
 - contenido Markdown
 - pasos
-- comandos y parámetros
+- comandos
 - tags
-- fecha de actualización
-- estado anclado
+- fecha de actualizacion
+- anclado
 
-Puedes:
+Acciones disponibles:
 
 - crear
 - editar
@@ -356,33 +303,23 @@ Puedes:
 - borrar a papelera
 - exportar a PDF
 
-### 4. Plantillas
-
-Las plantillas permiten crear fichas más rápido con:
-
-- contenido base
-- tags sugeridos
-- pasos sugeridos
-- comandos sugeridos
-- sección sugerida opcional
-
-Puedes:
+### Plantillas
 
 - crear plantillas
 - editarlas
-- usarlas para abrir una nueva ficha preconfigurada
+- usarlas para crear nuevas fichas ya preconfiguradas
 
-### 5. Búsqueda
+### Busqueda y filtros
 
-La búsqueda soporta:
+Soporta:
 
 - texto libre
-- filtros por sección
-- filtros por múltiples tags
+- filtro por seccion
+- filtro por multiples tags
 - solo ancladas
-- orden por fecha o título
+- orden por fecha o titulo
 
-Prefijos disponibles:
+Prefijos:
 
 - `/cmd`
 - `/env`
@@ -390,15 +327,20 @@ Prefijos disponibles:
 - `/uml`
 - `/task`
 
-### 6. Papelera
+Vistas rapidas:
 
-La papelera permite:
+- `Entorno`
+- `Credenciales`
+- `Incidencias`
+- `Ancladas`
 
-- restaurar fichas individuales
-- restaurar una sección completa
-- vaciar la papelera con confirmación
+### Papelera
 
-### 7. Importación y exportación
+- restaurar fichas
+- restaurar una seccion completa
+- vaciar la papelera con confirmacion
+
+### Importacion y exportacion
 
 Exportaciones:
 
@@ -406,189 +348,98 @@ Exportaciones:
 - `manual.json`
 - PDF por ficha
 
-Importación:
+Importacion:
 
-- importación de backups
-- modo `fusionar`
-- modo `reemplazar`
-- resumen de impacto antes de confirmar
+- fusionar
+- reemplazar
+- resumen previo de impacto
 
-### 8. Estados de guardado y conflictos
-
-La app ya contempla:
+### Guardado, conflictos y seguridad de sesion
 
 - guardado en disco
-- trabajo temporal en local
-- conflicto entre dos instancias abiertas
+- soporte local temporal
+- deteccion de conflictos entre instancias
 - recarga manual desde disco
+- deshacer
+- rehacer
 
-Acciones disponibles:
-
-- `Deshacer`
-- `Rehacer`
-- `Recargar desde disco`
-
-### 9. Validación de endpoints
-
-Las fichas de entorno pueden lanzar comprobaciones de endpoint desde el backend para evitar falsos positivos del navegador.
-
-### 10. Personalización
+### Diagnostico y personalizacion
 
 Desde Ajustes puedes cambiar:
 
-- nombre de la aplicación
-- título y descripción principal
+- nombre de la aplicacion
+- titulo y descripcion principal
 - recordatorio principal
 - textos laterales
 - icono
 - enlaces externos
 
-También existe una tarjeta de diagnóstico con:
+Tambien incluye diagnostico rapido con:
 
-- estado de servidor
-- estado de guardado
+- estado del servidor
+- estado del guardado
 - origen de datos
-- revisión activa
+- revision activa
 - volumen del manual
-- profundidad de deshacer/rehacer
+- profundidad de deshacer y rehacer
 
-## Pantallas y zonas de la app
+## Pantallas principales
 
 ### Home
 
 - hero
 - buscador
 - secciones
-- panel de plantillas
-- estadísticas
+- plantillas
+- estadisticas
 
 ### Resultados
 
 - listado filtrado
 - chips de filtros activos
-- ordenación
-- vistas rápidas
+- ordenacion
+- vistas rapidas
 
 ### Modal de ficha
 
-- datos básicos
+- datos basicos
 - editor Markdown
 - pasos
 - comandos
 - vista previa
 
-### Modal de sección
+### Modal de seccion
 
 - nombre
 - color
-- descripción
-- borrado de sección
+- descripcion
+- borrado de seccion
 
 ### Modal de plantilla
 
 - nombre
-- sección sugerida
-- título sugerido
+- seccion sugerida
+- titulo sugerido
 - tags
 - pasos
-- contenido base
+- contenido
 - comandos sugeridos
 
 ### Ajustes
 
-- personalización
+- personalizacion
 - branding
 - enlaces laterales
 - icono
-- diagnóstico
+- diagnostico
 
 ### Lateral
 
-- herramientas rápidas
+- herramientas rapidas
 - backups
 - papelera
 
-## Archivos y carpetas que no deben subirse al repo
-
-No deben versionarse:
-
-- `dist/`
-- `release/`
-- `release-fixed/`
-- `release-icon/`
-- `.runtime/`
-- `backups/`
-- `tmp-userdata/`
-- `public/images/`
-
-Eso ya está cubierto por [.gitignore](C:/Desarrollo/asistenteOnesait/.gitignore).
-
-## Seguridad y datos sensibles
-
-Recomendaciones importantes:
-
-- no subas credenciales reales a `src/data/manual.json`
-- no subas backups locales con datos sensibles
-- no subas imágenes operativas o temporales de `public/images/`
-- usa exportación manual o copias locales privadas si el contenido incluye accesos reales
-
-## Flujo recomendado de Git
-
-Si haces cambios de código:
-
-1. desarrolla con `npm run dev`
-2. verifica con `npm run build`
-3. sube solo código fuente y recursos de origen
-4. no hagas commit de `release/`, `dist/`, `backups/` ni datos locales
-
-## Solución de problemas
-
-### La app no abre con `Abrir Asistente.vbs`
-
-Comprueba:
-
-- que exista `dist/index.html`
-- que hayas ejecutado `npm run build`
-- que el puerto `3001` no esté bloqueado
-- los logs en `.runtime/logs/`
-
-### El servidor aparece como `KO`
-
-Posibles causas:
-
-- el backend no arrancó
-- había otra instancia antigua ocupando `3001`
-- se cerró la ventana pero no el servidor
-
-Prueba:
-
-1. ejecutar [Cerrar Asistente.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente.vbs)
-2. volver a abrir con [Abrir Asistente.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente.vbs)
-
-### El guardado falla
-
-Revisa:
-
-- si el servidor está en `online`
-- si hay `conflicto de guardado`
-- si estás trabajando solo en local
-
-Si hay conflicto:
-
-- usa `Recargar desde disco`
-- o exporta/importa antes de seguir
-
-### El push a GitHub falla
-
-No subas:
-
-- builds de Electron
-- ejecutables
-- backups
-- datos runtime
-- manuales con credenciales
-
-## Comandos útiles
+## Comandos utiles
 
 ```powershell
 # instalar dependencias
@@ -603,34 +454,131 @@ npm run build
 # vista previa de build
 npm run preview
 
-# escritorio en desarrollo
+# electron local
 npm run desktop
 
 # build de escritorio
 npm run desktop:build
 
-# build portable para Windows
+# build portable
 npm run desktop:portable
 ```
 
-## Estado actual del proyecto
+## Logs utiles
 
-El proyecto ya incorpora:
+Si algo falla, revisa:
+
+- [launcher.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/launcher.log)
+- [electron-launcher.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/electron-launcher.log)
+- [server.stdout.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/server.stdout.log)
+- [server.stderr.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/server.stderr.log)
+- [desktop-runtime.log](C:/Desarrollo/asistenteOnesait/.runtime/electron-userdata/desktop-runtime.log)
+
+## Solucion de problemas
+
+### La app abre en blanco
+
+Las causas mas comunes son:
+
+- error de render del frontend
+- build antigua en `dist`
+- estado local inconsistente
+
+Prueba:
+
+1. cierra la app con el script de cierre correspondiente
+2. ejecuta `npm run build`
+3. vuelve a abrir
+
+Nota:
+
+- [src/main.tsx](C:/Desarrollo/asistenteOnesait/src/main.tsx) incluye una captura de errores de render para evitar pantallas completamente mudas
+
+### El modo navegador no abre la interfaz
+
+Comprueba:
+
+- que exista `dist/index.html`
+- que `npm run build` se haya ejecutado
+- que el backend responda en `3001`
+- el contenido de [launcher.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/launcher.log)
+
+### Electron no muestra la ventana
+
+Comprueba:
+
+- que `dist` este actualizado
+- que no haya otra instancia previa
+- el contenido de [electron-launcher.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/electron-launcher.log)
+- el contenido de [desktop-runtime.log](C:/Desarrollo/asistenteOnesait/.runtime/electron-userdata/desktop-runtime.log)
+
+### El guardado falla
+
+Revisa:
+
+- si el servidor esta `online`
+- si hay conflicto de guardado
+- si estas en modo local temporal
+
+Si hay conflicto:
+
+- usa `Recargar desde disco`
+- o exporta/importa antes de continuar
+
+### El push a GitHub falla
+
+No subas:
+
+- `dist/`
+- `release/`
+- `release-fixed/`
+- `release-icon/`
+- `.runtime/`
+- `backups/`
+- `public/images/`
+- manuales o backups con credenciales reales
+
+## Carpetas que no deben versionarse
+
+- `dist/`
+- `release/`
+- `release-fixed/`
+- `release-icon/`
+- `.runtime/`
+- `backups/`
+- `tmp-userdata/`
+- `public/images/`
+
+Eso ya esta cubierto por [.gitignore](C:/Desarrollo/asistenteOnesait/.gitignore).
+
+## Seguridad
+
+Recomendaciones:
+
+- no subas credenciales reales a [src/data/manual.json](C:/Desarrollo/asistenteOnesait/src/data/manual.json)
+- no subas backups locales
+- no subas imagenes operativas temporales
+- usa copias privadas si el contenido incluye accesos reales
+
+## Estado actual
+
+El proyecto ya incluye:
 
 - persistencia unificada
-- papelera con restauración de fichas y secciones
+- guardado completo del manual
+- papelera con restauracion de fichas y secciones
 - deshacer y rehacer
-- control de conflictos entre instancias
-- importación con fusión o reemplazo
-- validación fiable de endpoints
-- diagnóstico de sesión
-- personalización de UI
+- conflictos entre instancias
+- importacion con fusion o reemplazo
+- validacion fiable de endpoints
+- diagnostico de sesion
+- personalizacion visual
+- lanzadores para modo navegador y modo Electron
 
 ## Posibles mejoras futuras
 
-- optimización del bundle de frontend
-- sanitización avanzada de datos sensibles en `manual.json`
-- sincronización multiusuario real
-- exportaciones más ricas
-- tests automáticos de interfaz y persistencia
-
+- optimizacion del bundle
+- tests automaticos de interfaz
+- sanitizacion mas avanzada de secretos
+- sincronizacion multiusuario real
+- exportaciones mas ricas
