@@ -47,6 +47,22 @@ export interface AppCustomizationSettings {
   trashSectionTitle: string;
 }
 
+export interface AppDiagnosticsSnapshot {
+  approximateSizeKb: number;
+  categoriesCount: number;
+  dataOriginLabel: string;
+  entriesCount: number;
+  hasSaveConflict: boolean;
+  lastSavedAt: string;
+  redoDepth: number;
+  revisionLabel: string;
+  saveStatusLabel: string;
+  serverStatusLabel: string;
+  templatesCount: number;
+  trashCount: number;
+  undoDepth: number;
+}
+
 export interface AppSettings {
   customization: AppCustomizationSettings;
   darkMode: boolean;
@@ -66,6 +82,7 @@ export interface EntryTemplate {
 
 export interface ManualData {
   categories: CategoryDefinition[];
+  deletedCategories?: CategoryDefinition[];
   entries: KnowledgeEntry[];
   settings: AppSettings;
   templates: EntryTemplate[];

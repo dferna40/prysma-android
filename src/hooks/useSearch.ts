@@ -27,16 +27,34 @@ const buildEntrySearchBlob = (entry: KnowledgeEntry) =>
     .join(' ')
     .toLowerCase();
 
+const matchesPrefixQuery = (
+  entry: KnowledgeEntry,
+  query: string,
+  predicate: (entry: KnowledgeEntry) => boolean,
+) => {
+  if (!predicate(entry)) {
+    return false;
+  }
+
+  if (!query) {
+    return true;
+  }
+
+  return buildEntrySearchBlob(entry).includes(query);
+};
+
 export function useSearch(
   entries: KnowledgeEntry[],
   rawSearchTerm: string,
   activeCategoryFilter?: string,
-  activeTagFilter?: string,
+  activeTagFilters: string[] = [],
 ) {
   return useMemo(() => {
     const term = normalize(rawSearchTerm);
     const normalizedCategoryFilter = normalize(activeCategoryFilter ?? '');
-    const normalizedTagFilter = normalize(activeTagFilter ?? '');
+    const normalizedTagFilters = activeTagFilters
+      .map((tag) => normalize(tag))
+      .filter(Boolean);
     let filteredEntries = entries;
 
     if (normalizedCategoryFilter) {
@@ -45,9 +63,11 @@ export function useSearch(
       );
     }
 
-    if (normalizedTagFilter) {
+    if (normalizedTagFilters.length) {
       filteredEntries = filteredEntries.filter((entry) =>
-        entry.tags.some((tag) => normalize(tag) === normalizedTagFilter),
+        normalizedTagFilters.every((activeTag) =>
+          entry.tags.some((tag) => normalize(tag) === activeTag),
+        ),
       );
     }
 
@@ -58,55 +78,71 @@ export function useSearch(
     if (term.startsWith('/cmd')) {
       const cmdQuery = normalize(term.replace('/cmd', ''));
 
-      return filteredEntries.filter((entry) => {
-        const validCategory =
-          entry.categoria === 'Batch' || entry.categoria === 'General';
-        const hasCommands = Boolean(entry.comandos?.length);
-
-        if (!validCategory || !hasCommands) {
-          return false;
-        }
-
-        if (!cmdQuery) {
-          return true;
-        }
-
-        return buildEntrySearchBlob(entry).includes(cmdQuery);
-      });
+      return filteredEntries.filter((entry) =>
+        matchesPrefixQuery(
+          entry,
+          cmdQuery,
+          (candidateEntry) =>
+            (candidateEntry.categoria === 'Batch' ||
+              candidateEntry.categoria === 'General') &&
+            Boolean(candidateEntry.comandos?.length),
+        ),
+      );
     }
 
     if (term.startsWith('/env')) {
       const envQuery = normalize(term.replace('/env', ''));
 
-      return filteredEntries.filter((entry) => {
-        if (entry.categoria !== 'Entorno') {
-          return false;
-        }
+      return filteredEntries.filter((entry) =>
+        matchesPrefixQuery(entry, envQuery, (candidateEntry) => candidateEntry.categoria === 'Entorno'),
+      );
+    }
 
-        if (!envQuery) {
-          return true;
-        }
+    if (term.startsWith('/db')) {
+      const dbQuery = normalize(term.replace('/db', ''));
 
-        return buildEntrySearchBlob(entry).includes(envQuery);
-      });
+      return filteredEntries.filter((entry) =>
+        matchesPrefixQuery(
+          entry,
+          dbQuery,
+          (candidateEntry) =>
+            candidateEntry.categoria === 'Batch' ||
+            candidateEntry.comandos?.some((command) =>
+              /sql|oracle|tabla|query|select|insert|update|delete/i.test(
+                `${command.label} ${command.value}`,
+              ),
+            ) === true ||
+            /sql|oracle|tabla|bbdd|base de datos|query/i.test(
+              buildEntrySearchBlob(candidateEntry),
+            ),
+        ),
+      );
     }
 
     if (term.startsWith('/uml')) {
       const umlQuery = normalize(term.replace('/uml', ''));
 
-      return filteredEntries.filter((entry) => {
-        if (entry.categoria !== 'UML') {
-          return false;
-        }
+      return filteredEntries.filter((entry) =>
+        matchesPrefixQuery(entry, umlQuery, (candidateEntry) => candidateEntry.categoria === 'UML'),
+      );
+    }
 
-        if (!umlQuery) {
-          return true;
-        }
+    if (term.startsWith('/task')) {
+      const taskQuery = normalize(term.replace('/task', ''));
 
-        return buildEntrySearchBlob(entry).includes(umlQuery);
-      });
+      return filteredEntries.filter((entry) =>
+        matchesPrefixQuery(
+          entry,
+          taskQuery,
+          (candidateEntry) =>
+            Boolean(candidateEntry.pasos?.length) ||
+            /\bpaso\b|\btarea\b|\bprocedimiento\b|\bchecklist\b/i.test(
+              buildEntrySearchBlob(candidateEntry),
+            ),
+        ),
+      );
     }
 
     return filteredEntries.filter((entry) => buildEntrySearchBlob(entry).includes(term));
-  }, [activeCategoryFilter, activeTagFilter, entries, rawSearchTerm]);
+  }, [activeCategoryFilter, activeTagFilters, entries, rawSearchTerm]);
 }

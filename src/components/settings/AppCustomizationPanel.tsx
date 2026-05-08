@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { AppLogo } from '../ui/AppLogo';
-import type { AppCustomizationSettings, ExternalToolLink } from '../../types';
+import type {
+  AppCustomizationSettings,
+  AppDiagnosticsSnapshot,
+  ExternalToolLink,
+} from '../../types';
 
 interface AppCustomizationPanelProps {
   customization: AppCustomizationSettings;
+  diagnostics: AppDiagnosticsSnapshot;
   onCancel: () => void;
   onSave: (nextCustomization: AppCustomizationSettings) => void;
 }
@@ -17,6 +22,7 @@ const createToolDraft = (index: number): ExternalToolLink => ({
 
 export function AppCustomizationPanel({
   customization,
+  diagnostics,
   onCancel,
   onSave,
 }: AppCustomizationPanelProps) {
@@ -101,15 +107,15 @@ export function AppCustomizationPanel({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-sky-600 dark:text-sky-300">
-              Configuracion global
+              Configuración general
             </p>
             <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-              Personaliza la interfaz general
+              Personaliza la experiencia general
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Desde aqui puedes editar el nombre de la aplicacion, los textos generales,
-              el recordatorio principal, el contenido del menu lateral y el icono del
-              aplicativo sin llenar la interfaz de botones de edicion.
+              Desde aquí puedes ajustar el nombre de la aplicación, los textos
+              principales, el recordatorio destacado, el contenido del lateral y
+              el icono, sin sobrecargar la interfaz con controles dispersos.
             </p>
           </div>
 
@@ -125,10 +131,10 @@ export function AppCustomizationPanel({
               />
               <div className="min-w-0">
                 <p className="truncate text-base font-bold text-slate-900 dark:text-white">
-                  {formState.appName || 'Nombre de la aplicacion'}
+                  {formState.appName || 'Nombre de la aplicación'}
                 </p>
                 <p className="truncate text-sm text-slate-500 dark:text-slate-300">
-                  {formState.heroTitle || 'Titulo principal'}
+                  {formState.heroTitle || 'Título principal'}
                 </p>
               </div>
             </div>
@@ -144,7 +150,7 @@ export function AppCustomizationPanel({
             </h3>
             <div className="mt-4 grid gap-4">
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Nombre de la aplicacion
+                Nombre de la aplicación
                 <input
                   value={formState.appName}
                   onChange={(event) => updateField('appName', event.target.value)}
@@ -153,7 +159,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo principal
+                Título principal
                 <input
                   value={formState.heroTitle}
                   onChange={(event) => updateField('heroTitle', event.target.value)}
@@ -162,7 +168,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Descripcion principal
+                Descripción principal
                 <textarea
                   value={formState.heroDescription}
                   onChange={(event) =>
@@ -190,14 +196,14 @@ export function AppCustomizationPanel({
           <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                Herramientas del menu lateral
+                Herramientas del menú lateral
               </h3>
               <button
                 type="button"
                 onClick={handleAddTool}
                   className="rounded-xl border border-emerald-500/60 bg-emerald-500/12 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/18 dark:text-emerald-300"
               >
-                Anadir enlace
+                Añadir acceso
               </button>
             </div>
 
@@ -239,7 +245,103 @@ export function AppCustomizationPanel({
         <div className="space-y-6">
           <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Icono del aplicativo
+              Diagnóstico rápido
+            </h3>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              Resumen del estado operativo actual, la sincronización del manual y
+              la salud general de la sesión.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
+                  Servidor
+                </p>
+                <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {diagnostics.serverStatusLabel}
+                </p>
+              </div>
+              <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
+                  Guardado
+                </p>
+                <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {diagnostics.saveStatusLabel}
+                </p>
+              </div>
+              <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
+                  Origen de datos
+                </p>
+                <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {diagnostics.dataOriginLabel}
+                </p>
+              </div>
+              <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
+                  Revisión activa
+                </p>
+                <p className="mt-1 break-all text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {diagnostics.revisionLabel}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">
+                  Manual
+                </p>
+                <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                  {diagnostics.categoriesCount} secciones
+                </p>
+                <p className="text-sm text-slate-700 dark:text-slate-200">
+                  {diagnostics.entriesCount} fichas
+                </p>
+                <p className="text-sm text-slate-700 dark:text-slate-200">
+                  {diagnostics.templatesCount} plantillas
+                </p>
+                <p className="text-sm text-slate-700 dark:text-slate-200">
+                  {diagnostics.trashCount} en papelera
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">
+                  Historial
+                </p>
+                <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                  {diagnostics.undoDepth} acciones para deshacer
+                </p>
+                <p className="text-sm text-slate-700 dark:text-slate-200">
+                  {diagnostics.redoDepth} acciones para rehacer
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">
+                  Huella
+                </p>
+                <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                  {diagnostics.approximateSizeKb} KB aprox.
+                </p>
+                <p className="text-sm text-slate-700 dark:text-slate-200">
+                  Último guardado: {diagnostics.lastSavedAt || 'sin registro'}
+                </p>
+                <p
+                  className={`text-sm ${
+                    diagnostics.hasSaveConflict
+                      ? 'text-rose-600 dark:text-rose-300'
+                      : 'text-emerald-700 dark:text-emerald-300'
+                  }`}
+                >
+                  {diagnostics.hasSaveConflict
+                    ? 'Hay conflicto con otra instancia'
+                    : 'Sin conflictos activos'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Icono de la aplicación
             </h3>
             <div className="mt-4 flex flex-col gap-4">
               <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:border-sky-500 hover:bg-sky-500/15 dark:text-sky-300">
@@ -257,7 +359,7 @@ export function AppCustomizationPanel({
                   updateField('appIconDataUrl', event.target.value)
                 }
                 className="themed-field w-full rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950/90 dark:text-white"
-                placeholder="O pega aqui una URL o Data URL del icono"
+                placeholder="O pega aquí una URL o Data URL del icono"
               />
               <button
                 type="button"
@@ -275,7 +377,7 @@ export function AppCustomizationPanel({
             </h3>
             <div className="mt-4 grid gap-4">
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo de herramientas externas
+                Título de herramientas externas
                 <input
                   value={formState.externalToolsTitle}
                   onChange={(event) =>
@@ -286,7 +388,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo del bloque de escritorio
+                Título del bloque de escritorio
                 <input
                   value={formState.sidebarIdentityTitle}
                   onChange={(event) =>
@@ -308,7 +410,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo de Global RGA
+                Título de Global RGA
                 <input
                   value={formState.globalRgaTitle}
                   onChange={(event) =>
@@ -341,7 +443,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo de DevTools
+                Título de DevTools
                 <input
                   value={formState.devToolsSectionTitle}
                   onChange={(event) =>
@@ -352,7 +454,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo de Backup
+                Título de Backup
                 <input
                   value={formState.backupSectionTitle}
                   onChange={(event) =>
@@ -363,7 +465,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo de Papelera
+                Título de Papelera
                 <input
                   value={formState.trashSectionTitle}
                   onChange={(event) =>

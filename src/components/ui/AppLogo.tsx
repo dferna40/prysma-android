@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 interface AppLogoProps {
   appIconDataUrl?: string;
   appName: string;
@@ -19,11 +21,15 @@ export function AppLogo({
   appName,
   className = 'h-10 w-10',
 }: AppLogoProps) {
-  if (appIconDataUrl.trim()) {
+  const [hasImageError, setHasImageError] = useState(false);
+  const resolvedIconUrl = appIconDataUrl.trim() || '/app-icon.png';
+
+  if (!hasImageError) {
     return (
       <img
-        src={appIconDataUrl}
+        src={resolvedIconUrl}
         alt={`Icono de ${appName}`}
+        onError={() => setHasImageError(true)}
         className={`${className} rounded-2xl border border-slate-200 bg-white object-cover shadow-sm dark:border-slate-700 dark:bg-slate-900`}
       />
     );

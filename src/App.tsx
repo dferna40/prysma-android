@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, CSSProperties } from 'react';
 import { AppCustomizationPanel } from './components/settings/AppCustomizationPanel';
 import { MainLayout } from './components/layout/MainLayout';
@@ -19,6 +19,7 @@ import {
   type ClipboardCopyEventDetail,
 } from './utils/clipboard';
 import type {
+  AppDiagnosticsSnapshot,
   AppSettings,
   AppCustomizationSettings,
   CategoryColorKey,
@@ -119,12 +120,83 @@ interface SaveToastState {
 
 type SaveSyncState = 'error' | 'idle' | 'pending' | 'saved' | 'saving';
 
+type ManualOriginState = 'bundled' | 'local-storage' | 'server';
 type ServerHealthState = 'checking' | 'offline' | 'online';
+type ImportMode = 'merge' | 'replace';
+type ResultSortMode = 'pinned-latest' | 'latest' | 'oldest' | 'title';
 
 interface CategoryDeleteConfirmationState {
   categoryName: string;
   entryCount: number;
 }
+
+interface BackupImportState {
+  fileName: string;
+  importedManualData: ManualData;
+}
+
+interface BackupImportSummary {
+  conflictingEntryIds: number;
+  conflictingEntryTitles: number;
+  conflictingTemplateIds: number;
+  conflictingTemplateNames: number;
+  conflictingTemplateTitles: number;
+  matchingCategories: number;
+  newCategories: number;
+  newEntries: number;
+  newTemplates: number;
+  newTrashEntries: number;
+}
+
+interface StoredManualSnapshot {
+  manualData: ManualData;
+  source: Exclude<ManualOriginState, 'server'>;
+}
+
+interface UndoSnapshot {
+  manualData: ManualData;
+}
+
+interface TrashCategorySummary {
+  entryCount: number;
+  name: string;
+}
+
+interface QuickViewDefinition {
+  categoryName?: string;
+  id: string;
+  label: string;
+  searchTerm?: string;
+  showPinnedOnly?: boolean;
+  tone: 'amber' | 'emerald' | 'sky' | 'violet';
+}
+
+const quickViews: QuickViewDefinition[] = [
+  {
+    categoryName: 'Entorno',
+    id: 'quick-entorno',
+    label: 'Entorno',
+    tone: 'sky',
+  },
+  {
+    categoryName: 'Accesos',
+    id: 'quick-credenciales',
+    label: 'Credenciales',
+    tone: 'violet',
+  },
+  {
+    id: 'quick-incidencias',
+    label: 'Incidencias',
+    searchTerm: 'incidencia',
+    tone: 'amber',
+  },
+  {
+    id: 'quick-ancladas',
+    label: 'Ancladas',
+    showPinnedOnly: true,
+    tone: 'emerald',
+  },
+];
 
 interface PdfCodeSegment {
   color: [number, number, number];
@@ -280,6 +352,7 @@ const normalizeManualData = (source: unknown): ManualData => {
 
     return {
       categories: deriveCategories(entries),
+      deletedCategories: [],
       entries,
       settings: defaultSettings,
       templates: [],
@@ -301,6 +374,16 @@ const normalizeManualData = (source: unknown): ManualData => {
 
     return {
       categories,
+      deletedCategories: Array.isArray(candidate.deletedCategories)
+        ? dedupeCategoriesByName(candidate.deletedCategories).filter(
+            (deletedCategory) =>
+              !categories.some(
+                (activeCategory) =>
+                  activeCategory.name.toLowerCase() ===
+                  deletedCategory.name.toLowerCase(),
+              ),
+          )
+        : [],
       entries,
       settings: {
         ...defaultSettings,
@@ -316,6 +399,7 @@ const normalizeManualData = (source: unknown): ManualData => {
 
   return {
     categories: [],
+    deletedCategories: [],
     entries: [],
     settings: defaultSettings,
     templates: [],
@@ -335,43 +419,84 @@ const extractManualImportSource = (source: unknown) => {
   return source;
 };
 
-const readStoredManualData = (): ManualData => {
+const readStoredManualSnapshot = (): StoredManualSnapshot => {
   const baseManual = normalizeManualData(manualEntries);
 
   if (typeof window === 'undefined') {
-    return baseManual;
+    return {
+      manualData: baseManual,
+      source: 'bundled',
+    };
   }
 
   try {
     const rawManual = window.localStorage.getItem(STORAGE_KEY);
     if (rawManual) {
-      return normalizeManualData(JSON.parse(rawManual));
+      return {
+        manualData: normalizeManualData(JSON.parse(rawManual)),
+        source: 'local-storage',
+      };
     }
 
     const rawLegacyOverrides = window.localStorage.getItem(
       LEGACY_COMMAND_STORAGE_KEY,
     );
     if (!rawLegacyOverrides) {
-      return baseManual;
+      return {
+        manualData: baseManual,
+        source: 'bundled',
+      };
     }
 
     const legacyOverrides = JSON.parse(rawLegacyOverrides) as CommandOverridesByEntry;
 
     return {
-      ...baseManual,
-      entries: applyLegacyCommandOverrides(baseManual.entries, legacyOverrides),
-      settings: baseManual.settings,
-      trash: baseManual.trash,
+      manualData: {
+        ...baseManual,
+        deletedCategories: [],
+        entries: applyLegacyCommandOverrides(baseManual.entries, legacyOverrides),
+        settings: baseManual.settings,
+        trash: baseManual.trash,
+      },
+      source: 'local-storage',
     };
   } catch {
-    return baseManual;
+    return {
+      manualData: baseManual,
+      source: 'bundled',
+    };
   }
 };
 
-const areEntriesEqual = (
-  firstEntries: KnowledgeEntry[],
-  secondEntries: KnowledgeEntry[],
-) => JSON.stringify(firstEntries) === JSON.stringify(secondEntries);
+const getFallbackManualSnapshot = (): StoredManualSnapshot => readStoredManualSnapshot();
+const MAX_UNDO_HISTORY = 20;
+
+const dedupeCategoriesByName = (categories: CategoryDefinition[]) => {
+  const categoriesMap = new Map<string, CategoryDefinition>();
+
+  categories.forEach((category) => {
+    const trimmedName = category.name.trim();
+    if (!trimmedName) {
+      return;
+    }
+
+    categoriesMap.set(trimmedName.toLowerCase(), {
+      ...getDefaultCategoryDefinition(trimmedName),
+      ...category,
+      name: trimmedName,
+      description:
+        category.description?.trim() ||
+        getDefaultCategoryDefinition(trimmedName).description,
+    });
+  });
+
+  return Array.from(categoriesMap.values());
+};
+
+const areManualDataEqual = (
+  firstManualData: ManualData,
+  secondManualData: ManualData,
+) => JSON.stringify(firstManualData) === JSON.stringify(secondManualData);
 
 const persistManualData = (manualData: ManualData) => {
   if (typeof window === 'undefined') {
@@ -381,6 +506,149 @@ const persistManualData = (manualData: ManualData) => {
   // Recordatorio: Si se desarrolla un microservicio Java para centralizar estos Health Checks o gestionar la persistencia de la papelera, utilizar estrictamente try-catch-resources para el cierre seguro de flujos y sockets.
   // Recordatorio: Para cualquier proceso en Java que gestione la lectura o escritura de estos archivos de backup o metadatos de fichas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(manualData));
+};
+
+const formatSavedAtTime = (date = new Date()) =>
+  new Intl.DateTimeFormat('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+
+const mergeByKey = <T,>(
+  currentItems: T[],
+  importedItems: T[],
+  getKey: (item: T) => string,
+) => {
+  const mergedMap = new Map<string, T>();
+
+  currentItems.forEach((item) => {
+    mergedMap.set(getKey(item), item);
+  });
+
+  importedItems.forEach((item) => {
+    mergedMap.set(getKey(item), item);
+  });
+
+  return Array.from(mergedMap.values());
+};
+
+const mergeManualData = (
+  currentManualData: ManualData,
+  importedManualData: ManualData,
+): ManualData => {
+  const mergedEntries = mergeByKey(
+    currentManualData.entries,
+    importedManualData.entries,
+    (entry) => entry.id,
+  );
+  const mergedTemplates = mergeByKey(
+    currentManualData.templates,
+    importedManualData.templates,
+    (template) => template.id,
+  );
+  const mergedCategories = deriveCategories(
+    mergedEntries,
+    mergeByKey(
+      currentManualData.categories,
+      importedManualData.categories,
+      (category) => category.name.toLowerCase(),
+    ),
+  );
+  const mergedTrash = mergeByKey(
+    currentManualData.trash.filter(
+      (trashEntry) => !mergedEntries.some((entry) => entry.id === trashEntry.id),
+    ),
+    importedManualData.trash.filter(
+      (trashEntry) => !mergedEntries.some((entry) => entry.id === trashEntry.id),
+    ),
+    (entry) => entry.id,
+  );
+  const mergedDeletedCategories = dedupeCategoriesByName([
+    ...(currentManualData.deletedCategories ?? []),
+    ...(importedManualData.deletedCategories ?? []),
+  ]).filter(
+    (deletedCategory) =>
+      !mergedCategories.some(
+        (activeCategory) =>
+          activeCategory.name.toLowerCase() === deletedCategory.name.toLowerCase(),
+      ),
+  );
+
+  return normalizeManualData({
+    categories: mergedCategories,
+    deletedCategories: mergedDeletedCategories,
+    entries: mergedEntries,
+    settings: {
+      ...currentManualData.settings,
+      ...importedManualData.settings,
+      customization: importedManualData.settings.customization,
+    },
+    templates: mergedTemplates,
+    trash: mergedTrash,
+  });
+};
+
+const buildBackupImportSummary = (
+  currentManualData: ManualData,
+  importedManualData: ManualData,
+): BackupImportSummary => {
+  const currentEntryIds = new Set(currentManualData.entries.map((entry) => entry.id));
+  const currentEntryTitles = new Set(
+    currentManualData.entries.map((entry) => normalizeComparableText(entry.titulo)),
+  );
+  const currentTemplateIds = new Set(
+    currentManualData.templates.map((template) => template.id),
+  );
+  const currentTemplateNames = new Set(
+    currentManualData.templates.map((template) =>
+      normalizeComparableText(template.name),
+    ),
+  );
+  const currentTemplateTitles = new Set(
+    currentManualData.templates.map((template) =>
+      normalizeComparableText(template.titulo),
+    ),
+  );
+  const currentCategories = new Set(
+    currentManualData.categories.map((category) =>
+      normalizeComparableText(category.name),
+    ),
+  );
+  const currentTrashIds = new Set(currentManualData.trash.map((entry) => entry.id));
+
+  return {
+    conflictingEntryIds: importedManualData.entries.filter((entry) =>
+      currentEntryIds.has(entry.id),
+    ).length,
+    conflictingEntryTitles: importedManualData.entries.filter((entry) =>
+      currentEntryTitles.has(normalizeComparableText(entry.titulo)),
+    ).length,
+    conflictingTemplateIds: importedManualData.templates.filter((template) =>
+      currentTemplateIds.has(template.id),
+    ).length,
+    conflictingTemplateNames: importedManualData.templates.filter((template) =>
+      currentTemplateNames.has(normalizeComparableText(template.name)),
+    ).length,
+    conflictingTemplateTitles: importedManualData.templates.filter((template) =>
+      currentTemplateTitles.has(normalizeComparableText(template.titulo)),
+    ).length,
+    matchingCategories: importedManualData.categories.filter((category) =>
+      currentCategories.has(normalizeComparableText(category.name)),
+    ).length,
+    newCategories: importedManualData.categories.filter(
+      (category) => !currentCategories.has(normalizeComparableText(category.name)),
+    ).length,
+    newEntries: importedManualData.entries.filter(
+      (entry) => !currentEntryIds.has(entry.id),
+    ).length,
+    newTemplates: importedManualData.templates.filter(
+      (template) => !currentTemplateIds.has(template.id),
+    ).length,
+    newTrashEntries: importedManualData.trash.filter(
+      (entry) =>
+        !currentTrashIds.has(entry.id) && !currentEntryIds.has(entry.id),
+    ).length,
+  };
 };
 
 const splitLines = (value: string) =>
@@ -398,6 +666,29 @@ const normalizeTags = (value: string) =>
         .filter(Boolean),
     ),
   );
+
+const normalizeComparableText = (value: string) =>
+  value
+    .trim()
+    .toLocaleLowerCase('es-ES')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+const getQuickViewToneClass = (tone: QuickViewDefinition['tone']) => {
+  if (tone === 'emerald') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-200';
+  }
+
+  if (tone === 'violet') {
+    return 'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-400/20 dark:bg-violet-500/10 dark:text-violet-200';
+  }
+
+  if (tone === 'amber') {
+    return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-200';
+  }
+
+  return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-400/20 dark:bg-sky-500/10 dark:text-sky-200';
+};
 
 const hexToRgba = (hex: string, alpha: number) => {
   const normalizedHex = hex.replace('#', '');
@@ -985,13 +1276,27 @@ const pdfCodeKeywords = new Set([
 
 const markdownImagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
 
+const getApiBaseUrl = () => {
+  if (typeof window === 'undefined') {
+    return 'http://localhost:3001';
+  }
+
+  const { origin } = window.location;
+
+  if (/localhost:517\d|127\.0\.0\.1:517\d/.test(origin)) {
+    return 'http://localhost:3001';
+  }
+
+  return origin;
+};
+
 const resolvePdfImageUrl = (source: string) => {
   if (/^https?:\/\//i.test(source)) {
     return source;
   }
 
   if (source.startsWith('/images/')) {
-    return `http://localhost:3001${source}`;
+    return `${getApiBaseUrl()}${source}`;
   }
 
   if (source.startsWith('/')) {
@@ -1053,10 +1358,16 @@ export const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('');
-  const [activeTagFilter, setActiveTagFilter] = useState('');
+  const [activeTagFilters, setActiveTagFilters] = useState<string[]>([]);
+  const [resultSortMode, setResultSortMode] =
+    useState<ResultSortMode>('pinned-latest');
+  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
   const [activeView, setActiveView] = useState<'home' | 'settings'>('home');
-  const [manualData, setManualData] = useState<ManualData>(() =>
-    readStoredManualData(),
+  const initialManualSnapshotRef = useRef<StoredManualSnapshot>(
+    getFallbackManualSnapshot(),
+  );
+  const [manualData, setManualData] = useState<ManualData>(
+    () => initialManualSnapshotRef.current.manualData,
   );
   const [modalState, setModalState] = useState<ModalState>(null);
   const [entryForm, setEntryForm] = useState<EntryFormState>(() =>
@@ -1068,6 +1379,8 @@ export const App = () => {
   const [templateForm, setTemplateForm] = useState<TemplateFormState | null>(
     null,
   );
+  const [backupImportState, setBackupImportState] =
+    useState<BackupImportState | null>(null);
   const [formError, setFormError] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [activeToolbarActionId, setActiveToolbarActionId] = useState('');
@@ -1081,8 +1394,15 @@ export const App = () => {
   const [saveToast, setSaveToast] = useState<SaveToastState | null>(null);
   const [saveSyncState, setSaveSyncState] = useState<SaveSyncState>('idle');
   const [lastSavedAt, setLastSavedAt] = useState('');
+  const [hasSaveConflict, setHasSaveConflict] = useState(false);
+  const [manualOriginState, setManualOriginState] = useState<ManualOriginState>(
+    initialManualSnapshotRef.current.source,
+  );
+  const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<UndoSnapshot[]>([]);
   const [serverHealthState, setServerHealthState] =
     useState<ServerHealthState>('checking');
+  const manualServerRevisionRef = useRef('');
   const shouldPersistToServerRef = useRef(false);
   const customization = manualData.settings.customization;
 
@@ -1100,28 +1420,84 @@ export const App = () => {
     manualData.entries,
     debouncedSearchTerm,
     activeCategoryFilter,
-    activeTagFilter,
+    activeTagFilters,
   );
-  const sortPinnedEntries = (entries: KnowledgeEntry[]) =>
+  const sortEntries = (entries: KnowledgeEntry[], sortMode: ResultSortMode) =>
     [...entries].sort((firstEntry, secondEntry) => {
+      if (sortMode === 'title') {
+        return firstEntry.titulo.localeCompare(secondEntry.titulo, 'es');
+      }
+
+      const dateDifference =
+        new Date(secondEntry.updatedAt ?? 0).getTime() -
+        new Date(firstEntry.updatedAt ?? 0).getTime();
+
+      if (sortMode === 'latest') {
+        return dateDifference;
+      }
+
+      if (sortMode === 'oldest') {
+        return -dateDifference;
+      }
+
       if (firstEntry.isPinned !== secondEntry.isPinned) {
         return firstEntry.isPinned ? -1 : 1;
       }
 
-      return (
-        new Date(secondEntry.updatedAt ?? 0).getTime() -
-        new Date(firstEntry.updatedAt ?? 0).getTime()
-      );
+      return dateDifference;
     });
-  const sortedResults = useMemo(() => sortPinnedEntries(results), [results]);
+  const visibleResults = useMemo(
+    () => (showPinnedOnly ? results.filter((entry) => entry.isPinned) : results),
+    [results, showPinnedOnly],
+  );
+  const sortedResults = useMemo(
+    () => sortEntries(visibleResults, resultSortMode),
+    [resultSortMode, visibleResults],
+  );
   const quickAccessEntries = useMemo(
-    () => sortPinnedEntries(manualData.entries.filter((entry) => entry.isPinned)),
+    () =>
+      sortEntries(
+        manualData.entries.filter((entry) => entry.isPinned),
+        'pinned-latest',
+      ),
     [manualData.entries],
+  );
+  const restorableTrashCategories = useMemo<TrashCategorySummary[]>(() => {
+    const trashCategoryMap = new Map<string, TrashCategorySummary>();
+
+    manualData.trash.forEach((entry) => {
+      const trimmedName = entry.categoria.trim();
+      const key = trimmedName.toLowerCase();
+      const currentSummary = trashCategoryMap.get(key);
+
+      if (currentSummary) {
+        currentSummary.entryCount += 1;
+        return;
+      }
+
+      trashCategoryMap.set(key, {
+        entryCount: 1,
+        name: trimmedName,
+      });
+    });
+
+    return Array.from(trashCategoryMap.values()).sort((firstCategory, secondCategory) =>
+      firstCategory.name.localeCompare(secondCategory.name, 'es'),
+    );
+  }, [manualData.trash]);
+  const backupImportSummary = useMemo(
+    () =>
+      backupImportState
+        ? buildBackupImportSummary(manualData, backupImportState.importedManualData)
+        : null,
+    [backupImportState, manualData],
   );
   const hasActiveFilters =
     searchTerm.trim().length > 0 ||
     activeCategoryFilter.trim().length > 0 ||
-    activeTagFilter.trim().length > 0;
+    activeTagFilters.length > 0 ||
+    showPinnedOnly ||
+    resultSortMode !== 'pinned-latest';
   const activeResultCategory = activeCategoryFilter
     ? categoryMap.get(activeCategoryFilter.toLowerCase())
     : undefined;
@@ -1185,7 +1561,7 @@ export const App = () => {
 
     const checkServerHealth = async () => {
       try {
-        const response = await fetch('http://localhost:3001/health');
+        const response = await fetch(`${getApiBaseUrl()}/health`);
 
         if (!response.ok) {
           throw new Error('Servidor no disponible');
@@ -1214,6 +1590,113 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    const loadManualFromServer = async () => {
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/manual`);
+
+        if (!response.ok) {
+          throw new Error('No se pudo cargar el manual inicial.');
+        }
+
+        const payload = (await response.json()) as
+          | { data?: unknown; revision?: string }
+          | ManualData;
+        const serverManual = normalizeManualData(
+          payload && typeof payload === 'object' && 'data' in payload
+            ? payload.data
+            : payload,
+        );
+        const revision =
+          payload && typeof payload === 'object' && 'revision' in payload
+            ? payload.revision
+            : '';
+
+        if (!isCancelled) {
+          persistManualData(serverManual);
+          setManualData(serverManual);
+          manualServerRevisionRef.current = typeof revision === 'string' ? revision : '';
+          setHasSaveConflict(false);
+          setManualOriginState('server');
+          setUndoStack([]);
+          setRedoStack([]);
+          setServerHealthState('online');
+          setSaveSyncState('saved');
+          setLastSavedAt(formatSavedAtTime());
+        }
+      } catch {
+        if (!isCancelled) {
+          setServerHealthState('offline');
+        }
+      }
+    };
+
+    void loadManualFromServer();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  const reloadManualFromServer = async () => {
+    const hasUnsyncedChanges =
+      hasSaveConflict || saveSyncState === 'error' || saveSyncState === 'pending';
+
+    if (hasUnsyncedChanges) {
+      const confirmed = window.confirm(
+        'Hay cambios locales pendientes o en conflicto. Si recargas desde disco, se sustituira el estado actual por el del servidor. ¿Quieres continuar?',
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/manual`);
+
+      if (!response.ok) {
+        throw new Error('No se pudo recargar el manual desde disco.');
+      }
+
+      const payload = (await response.json()) as
+        | { data?: unknown; revision?: string }
+        | ManualData;
+      const serverManual = normalizeManualData(
+        payload && typeof payload === 'object' && 'data' in payload
+          ? payload.data
+          : payload,
+      );
+      const revision =
+        payload && typeof payload === 'object' && 'revision' in payload
+          ? payload.revision
+          : '';
+
+      persistManualData(serverManual);
+      setManualData(serverManual);
+      manualServerRevisionRef.current = typeof revision === 'string' ? revision : '';
+      setHasSaveConflict(false);
+      setManualOriginState('server');
+      setUndoStack([]);
+      setRedoStack([]);
+      setServerHealthState('online');
+      setSaveSyncState('saved');
+      setLastSavedAt(formatSavedAtTime());
+      setSaveToast({
+        message: 'Estado recargado desde disco correctamente.',
+        tone: 'success',
+      });
+    } catch {
+      setServerHealthState('offline');
+      setSaveToast({
+        message: 'No se pudo recargar el estado desde el servidor.',
+        tone: 'error',
+      });
+    }
+  };
+
+  useEffect(() => {
     if (!shouldPersistToServerRef.current) {
       return;
     }
@@ -1226,39 +1709,56 @@ export const App = () => {
     const persistManualOnServer = async () => {
       setSaveSyncState('saving');
       try {
-        const response = await fetch('http://localhost:3001/save-manual', {
+        const response = await fetch(`${getApiBaseUrl()}/save-manual`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(manualData.entries),
+          body: JSON.stringify({
+            data: manualData,
+            expectedRevision: manualServerRevisionRef.current || undefined,
+          }),
         });
+
+        const payload = (await response.json()) as {
+          currentRevision?: string;
+          error?: string;
+          revision?: string;
+        };
+
+        if (response.status === 409 || payload.error === 'save-conflict') {
+          throw new Error('save-conflict');
+        }
 
         if (!response.ok) {
           throw new Error('La respuesta del servidor no fue valida.');
         }
 
         if (!isCancelled) {
+          manualServerRevisionRef.current =
+            typeof payload.revision === 'string' ? payload.revision : '';
+          setHasSaveConflict(false);
           setServerHealthState('online');
+          setManualOriginState('server');
           setSaveSyncState('saved');
-          setLastSavedAt(
-            new Intl.DateTimeFormat('es-ES', {
-              hour: '2-digit',
-              minute: '2-digit',
-            }).format(new Date()),
-          );
+          setLastSavedAt(formatSavedAtTime());
           setSaveToast({
             message: 'Cambios guardados permanentemente en el archivo.',
             tone: 'success',
           });
         }
-      } catch {
+      } catch (error) {
         if (!isCancelled) {
-          setServerHealthState('offline');
+          const isSaveConflict =
+            error instanceof Error && error.message === 'save-conflict';
+
+          setServerHealthState(isSaveConflict ? 'online' : 'offline');
+          setHasSaveConflict(isSaveConflict);
           setSaveSyncState('error');
           setSaveToast({
-            message:
-              'Error de conexión con el servidor. Por favor, descarga el JSON manualmente para no perder los cambios.',
+            message: isSaveConflict
+              ? 'Se ha detectado otra instancia con cambios guardados. Recarga o importa antes de volver a guardar para no sobrescribir datos.'
+              : 'Error de conexión con el servidor. Por favor, descarga el JSON manualmente para no perder los cambios.',
             tone: 'error',
           });
         }
@@ -1272,7 +1772,7 @@ export const App = () => {
       isCancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [manualData.entries]);
+  }, [manualData]);
 
   const openCreateEntryModal = (
     prefilledCategory?: string,
@@ -1351,16 +1851,70 @@ export const App = () => {
   ) => {
     setManualData((currentManualData) => {
       const nextManualData = normalizeManualData(updater(currentManualData));
-      const entriesChanged = !areEntriesEqual(
-        currentManualData.entries,
-        nextManualData.entries,
-      );
-      shouldPersistToServerRef.current = entriesChanged;
-      if (entriesChanged) {
+      const manualChanged = !areManualDataEqual(currentManualData, nextManualData);
+      shouldPersistToServerRef.current = manualChanged;
+      if (manualChanged) {
+        setUndoStack((currentUndoStack) => [
+          ...currentUndoStack.slice(-(MAX_UNDO_HISTORY - 1)),
+          {
+            manualData: currentManualData,
+          },
+        ]);
+        setRedoStack([]);
         setSaveSyncState('pending');
       }
       persistManualData(nextManualData);
       return nextManualData;
+    });
+  };
+
+  const handleUndoRecentChange = () => {
+    const previousSnapshot = undoStack.at(-1);
+
+    if (!previousSnapshot) {
+      return;
+    }
+
+    setUndoStack((currentUndoStack) => currentUndoStack.slice(0, -1));
+    setRedoStack((currentRedoStack) => [
+      ...currentRedoStack.slice(-(MAX_UNDO_HISTORY - 1)),
+      {
+        manualData,
+      },
+    ]);
+    persistManualData(previousSnapshot.manualData);
+    shouldPersistToServerRef.current = true;
+    setSaveSyncState('pending');
+    setManualData(previousSnapshot.manualData);
+    setActiveView('home');
+    setSaveToast({
+      message: 'Se ha deshecho el ultimo cambio.',
+      tone: 'success',
+    });
+  };
+
+  const handleRedoRecentChange = () => {
+    const nextSnapshot = redoStack.at(-1);
+
+    if (!nextSnapshot) {
+      return;
+    }
+
+    setRedoStack((currentRedoStack) => currentRedoStack.slice(0, -1));
+    setUndoStack((currentUndoStack) => [
+      ...currentUndoStack.slice(-(MAX_UNDO_HISTORY - 1)),
+      {
+        manualData,
+      },
+    ]);
+    persistManualData(nextSnapshot.manualData);
+    shouldPersistToServerRef.current = true;
+    setSaveSyncState('pending');
+    setManualData(nextSnapshot.manualData);
+    setActiveView('home');
+    setSaveToast({
+      message: 'Se ha rehecho el ultimo cambio deshecho.',
+      tone: 'success',
     });
   };
 
@@ -2356,7 +2910,7 @@ export const App = () => {
         });
       }
 
-  // A partir de ahora, para el código que pueda generar alguna excepción, siempre debo usar try-catch-resources en Java para garantizar el cierre seguro de los flujos del archivo PDF generado.
+  // A partir de ahora, para el cÃ³digo que pueda generar alguna excepciÃ³n, siempre debo usar try-catch-resources en Java para garantizar el cierre seguro de los flujos del archivo PDF generado.
       pdf.save(`${entry.id}.pdf`);
     } catch (error) {
       console.error('No se pudo exportar la ficha a PDF.', error);
@@ -2372,7 +2926,7 @@ export const App = () => {
 
     if (!trimmedCategory || !trimmedTitle || !trimmedContent) {
       setFormError(
-        'Categoria, titulo y contenido son obligatorios para guardar la ficha.',
+        'Categoría, título y contenido son obligatorios para guardar la ficha.',
       );
       return;
     }
@@ -2382,7 +2936,7 @@ export const App = () => {
 
     if (!existingCategory) {
       setFormError(
-        'La ficha debe pertenecer a una seccion existente. Crea primero la seccion desde la Home si aun no existe.',
+        'La ficha debe pertenecer a una sección existente. Crea primero la sección desde la Home si aún no existe.',
       );
       return;
     }
@@ -2401,6 +2955,19 @@ export const App = () => {
     if (duplicateEntryId) {
       setFormError(
         'Ya existe una ficha con ese ID. Usa otro identificador o deja el campo vacio para autogenerarlo.',
+      );
+      return;
+    }
+
+    const duplicateEntryTitle = manualData.entries.some(
+      (entry) =>
+        normalizeComparableText(entry.titulo) ===
+          normalizeComparableText(trimmedTitle) && entry.id !== originalId,
+    );
+
+    if (duplicateEntryTitle) {
+      setFormError(
+        'Ya existe una ficha con ese título. Cambia el título para evitar duplicados.',
       );
       return;
     }
@@ -2465,7 +3032,7 @@ export const App = () => {
     const trimmedName = categoryForm.name.trim();
     if (!trimmedName || !categoryForm.description.trim()) {
       setFormError(
-        'El nombre y la descripcion de la seccion son obligatorios.',
+        'El nombre y la descripción de la sección son obligatorios.',
       );
       return;
     }
@@ -2479,7 +3046,7 @@ export const App = () => {
 
     if (duplicateCategory) {
       setFormError(
-        'Ya existe una seccion con ese nombre. Usa otro nombre o edita la existente.',
+        'Ya existe una sección con ese nombre. Usa otro nombre o edita la existente.',
       );
       return;
     }
@@ -2540,7 +3107,7 @@ export const App = () => {
       )
     ) {
       setFormError(
-        'La seccion sugerida de la plantilla debe existir antes de guardarla.',
+        'La sección sugerida de la plantilla debe existir antes de guardarla.',
       );
       return;
     }
@@ -2558,6 +3125,37 @@ export const App = () => {
     if (duplicateTemplateId) {
       setFormError(
         'Ya existe una plantilla con ese ID. Usa otro identificador o deja el campo vacio para autogenerarlo.',
+      );
+      return;
+    }
+
+    const duplicateTemplateName = manualData.templates.some(
+      (template) =>
+        normalizeComparableText(template.name) ===
+          normalizeComparableText(trimmedName) &&
+        template.id !== originalTemplateId,
+    );
+
+    if (duplicateTemplateName) {
+      setFormError(
+        'Ya existe una plantilla con ese nombre. Cambia el nombre para evitar duplicados.',
+      );
+      return;
+    }
+
+    const trimmedTemplateTitle = templateForm.titulo.trim();
+    const duplicateTemplateTitle = trimmedTemplateTitle
+      ? manualData.templates.some(
+          (template) =>
+            normalizeComparableText(template.titulo) ===
+              normalizeComparableText(trimmedTemplateTitle) &&
+            template.id !== originalTemplateId,
+        )
+      : false;
+
+    if (duplicateTemplateTitle) {
+      setFormError(
+        'Ya existe una plantilla con ese titulo sugerido. Cambialo para evitar duplicados.',
       );
       return;
     }
@@ -2736,11 +3334,88 @@ export const App = () => {
         return currentManualData;
       }
 
+      const categoryAlreadyExists = currentManualData.categories.some(
+        (category) =>
+          category.name.toLowerCase() === entryToRestore.categoria.toLowerCase(),
+      );
+
       return {
         ...currentManualData,
+        deletedCategories: (currentManualData.deletedCategories ?? []).filter(
+          (category) =>
+            category.name.toLowerCase() !== entryToRestore.categoria.toLowerCase(),
+        ),
+        categories: categoryAlreadyExists
+          ? currentManualData.categories
+          : [
+              ...currentManualData.categories,
+              currentManualData.deletedCategories?.find(
+                (category) =>
+                  category.name.toLowerCase() ===
+                  entryToRestore.categoria.toLowerCase(),
+              ) ?? getDefaultCategoryDefinition(entryToRestore.categoria),
+            ],
         entries: [...currentManualData.entries, entryToRestore],
         trash: currentManualData.trash.filter((entry) => entry.id !== entryId),
       };
+    });
+  };
+
+  const handleRestoreCategory = (categoryName: string) => {
+    updateManualData((currentManualData) => {
+      const entriesToRestore = currentManualData.trash.filter(
+        (entry) => entry.categoria.toLowerCase() === categoryName.toLowerCase(),
+      );
+
+      if (!entriesToRestore.length) {
+        return currentManualData;
+      }
+
+      const deletedCategoryDefinition =
+        currentManualData.deletedCategories?.find(
+          (category) => category.name.toLowerCase() === categoryName.toLowerCase(),
+        ) ?? getDefaultCategoryDefinition(categoryName);
+      const categoryAlreadyExists = currentManualData.categories.some(
+        (category) => category.name.toLowerCase() === categoryName.toLowerCase(),
+      );
+
+      return {
+        ...currentManualData,
+        deletedCategories: (currentManualData.deletedCategories ?? []).filter(
+          (category) => category.name.toLowerCase() !== categoryName.toLowerCase(),
+        ),
+        categories: categoryAlreadyExists
+          ? currentManualData.categories
+          : [...currentManualData.categories, deletedCategoryDefinition],
+        entries: [...currentManualData.entries, ...entriesToRestore],
+        trash: currentManualData.trash.filter(
+          (entry) => entry.categoria.toLowerCase() !== categoryName.toLowerCase(),
+        ),
+      };
+    });
+  };
+
+  const handleEmptyTrash = () => {
+    if (!manualData.trash.length) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Esta acción eliminará definitivamente todas las fichas de la papelera y no se podrán restaurar después. ¿Quieres continuar?',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    updateManualData((currentManualData) => ({
+      ...currentManualData,
+      deletedCategories: [],
+      trash: [],
+    }));
+    setSaveToast({
+      message: 'La papelera se ha vaciado definitivamente.',
+      tone: 'success',
     });
   };
 
@@ -2766,22 +3441,43 @@ export const App = () => {
 
     const { categoryName } = deleteConfirmationCategory;
 
-    updateManualData((currentManualData) => ({
-      ...currentManualData,
-      categories: currentManualData.categories.filter(
-        (category) => category.name.toLowerCase() !== categoryName.toLowerCase(),
-      ),
-      entries: currentManualData.entries.filter(
-        (entry) => entry.categoria.toLowerCase() !== categoryName.toLowerCase(),
-      ),
-    }));
+    updateManualData((currentManualData) => {
+      const entriesToTrash = currentManualData.entries.filter(
+        (entry) => entry.categoria.toLowerCase() === categoryName.toLowerCase(),
+      );
+
+      return {
+        ...currentManualData,
+        deletedCategories: [
+          ...(currentManualData.deletedCategories ?? []).filter(
+            (category) => category.name.toLowerCase() !== categoryName.toLowerCase(),
+          ),
+          ...currentManualData.categories.filter(
+            (category) => category.name.toLowerCase() === categoryName.toLowerCase(),
+          ),
+        ],
+        categories: currentManualData.categories.filter(
+          (category) => category.name.toLowerCase() !== categoryName.toLowerCase(),
+        ),
+        entries: currentManualData.entries.filter(
+          (entry) => entry.categoria.toLowerCase() !== categoryName.toLowerCase(),
+        ),
+        trash: [
+          ...entriesToTrash,
+          ...currentManualData.trash.filter(
+            (entry) =>
+              !entriesToTrash.some((deletedEntry) => deletedEntry.id === entry.id),
+          ),
+        ],
+      };
+    });
 
     setDeleteConfirmationCategory(null);
     closeModal();
   };
 
   const handleExport = () => {
-    const exportPayload = manualData.entries;
+    const exportPayload = manualData;
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
       type: 'application/json',
     });
@@ -2794,7 +3490,7 @@ export const App = () => {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(downloadUrl);
     window.alert(
-      'Guia: este archivo ya sale como manual.json. Sustituyelo en src/data/manual.json para convertirlo en la nueva base del asistente.',
+      'Guia: este archivo ya sale con el manual completo. Sustituyelo en src/data/manual.json para convertirlo en la nueva base del asistente.',
     );
   };
 
@@ -2831,6 +3527,51 @@ export const App = () => {
     backupInputRef.current?.click();
   };
 
+  const closeBackupImportModal = () => {
+    setBackupImportState(null);
+  };
+
+  const applyImportedManualData = (
+    importedManualData: ManualData,
+    importMode: ImportMode,
+  ) => {
+    const nextManualData =
+      importMode === 'replace'
+        ? importedManualData
+        : mergeManualData(manualData, importedManualData);
+
+    setUndoStack((currentUndoStack) => [
+      ...currentUndoStack.slice(-(MAX_UNDO_HISTORY - 1)),
+      {
+        manualData,
+      },
+    ]);
+    persistManualData(nextManualData);
+    shouldPersistToServerRef.current = true;
+    setUndoStack((currentUndoStack) => [
+      ...currentUndoStack.slice(-(MAX_UNDO_HISTORY - 1)),
+      {
+        manualData,
+      },
+    ]);
+    setRedoStack([]);
+    setSaveSyncState('pending');
+    setManualData(nextManualData);
+    setSearchTerm('');
+    setActiveCategoryFilter('');
+    setActiveTagFilters([]);
+    setShowPinnedOnly(false);
+    setResultSortMode('pinned-latest');
+    setBackupImportState(null);
+    setSaveToast({
+      message:
+        importMode === 'replace'
+          ? 'Backup importado reemplazando el estado actual.'
+          : 'Backup importado fusionando el contenido con el estado actual.',
+      tone: 'success',
+    });
+  };
+
   const handleImportBackup = async (file?: File) => {
     if (!file) {
       return;
@@ -2840,24 +3581,15 @@ export const App = () => {
       // Recordatorio: Para cualquier proceso en Java que gestione la lectura o escritura de estos archivos de backup o metadatos de fichas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
       const rawBackup = await file.text();
       const parsedBackup = JSON.parse(rawBackup);
-      const nextManualData = normalizeManualData(
+      const importedManualData = normalizeManualData(
         extractManualImportSource(parsedBackup),
       );
-      const importSummaryConfirmed = window.confirm(
-      `Se importaran ${nextManualData.entries.length} fichas y ${nextManualData.categories.length} secciones. El estado local actual sera reemplazado. ¿Quieres continuar?`,
-      );
-
-      if (!importSummaryConfirmed) {
-        return;
-      }
-
-      persistManualData(nextManualData);
-      shouldPersistToServerRef.current = true;
-      setSaveSyncState('pending');
-      setManualData(nextManualData);
-      setSearchTerm('');
+      setBackupImportState({
+        fileName: file.name,
+        importedManualData,
+      });
     } catch {
-      window.alert('No se pudo importar el backup. Revisa que el JSON sea valido.');
+      window.alert('No se pudo importar el backup. Revisa que el JSON sea válido.');
     }
   };
 
@@ -2884,7 +3616,7 @@ export const App = () => {
       // servidor Java, es imperativo usar try-catch-resources para el manejo
       // de los Streams y asegurar la liberacion de memoria en el entorno RGA
       // [cite: 2026-02-12].
-      const response = await fetch('http://localhost:3001/upload', {
+      const response = await fetch(`${getApiBaseUrl()}/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -2933,7 +3665,9 @@ export const App = () => {
     setSearchTerm('');
     setDebouncedSearchTerm('');
     setActiveCategoryFilter('');
-    setActiveTagFilter('');
+    setActiveTagFilters([]);
+    setShowPinnedOnly(false);
+    setResultSortMode('pinned-latest');
     setActiveView('home');
   };
   const handleOpenSettingsView = () => {
@@ -2955,15 +3689,35 @@ export const App = () => {
     setActiveView('home');
     setActiveCategoryFilter(categoryName);
   };
+  const isQuickViewActive = (quickView: QuickViewDefinition) =>
+    (quickView.categoryName ?? '') === activeCategoryFilter &&
+    (quickView.searchTerm ?? '') === searchTerm &&
+    Boolean(quickView.showPinnedOnly) === showPinnedOnly;
+  const applyQuickView = (quickView: QuickViewDefinition) => {
+    setActiveView('home');
+    setSearchTerm(quickView.searchTerm ?? '');
+    setDebouncedSearchTerm(quickView.searchTerm ?? '');
+    setActiveCategoryFilter(quickView.categoryName ?? '');
+    setActiveTagFilters([]);
+    setShowPinnedOnly(Boolean(quickView.showPinnedOnly));
+    setResultSortMode(
+      quickView.showPinnedOnly ? 'pinned-latest' : 'pinned-latest',
+    );
+  };
   const handleTagFilter = (tag: string) => {
     setActiveView('home');
-    setActiveTagFilter(tag.toLowerCase());
+    setActiveTagFilters((currentTags) => {
+      const normalizedTag = tag.toLowerCase();
+      return currentTags.includes(normalizedTag)
+        ? currentTags.filter((currentTag) => currentTag !== normalizedTag)
+        : [...currentTags, normalizedTag];
+    });
   };
   const handleSearchTermChange = (value: string) => {
     setActiveView('home');
     setSearchTerm(value);
   };
-  // Recordatorio: Si se implementa una lógica Java para la persistencia de estos cambios o el procesado de comandos en el servidor, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos y configuración.
+  // Recordatorio: Si se implementa una lÃ³gica Java para la persistencia de estos cambios o el procesado de comandos en el servidor, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos y configuraciÃ³n.
   const toolbarContainerStyle = {
     ...entryThemeVars,
     borderColor: getCategoryColorHex(entryEditorColorKey),
@@ -3107,7 +3861,7 @@ export const App = () => {
             setEntryForm((current) => ({ ...current, contenido: nextValue })),
           '## ',
           '',
-          'Nueva seccion',
+          'Nueva sección',
         ),
     },
     {
@@ -3129,17 +3883,22 @@ export const App = () => {
   const sidebarContent = (
     <SidebarUtilities
       customization={customization}
+      onEmptyTrash={handleEmptyTrash}
       onExportBackup={handleExportBackup}
       onExportManual={handleExport}
       onImportBackupClick={handleImportBackupClick}
+      onRestoreCategory={handleRestoreCategory}
       onRestoreEntry={handleRestoreEntry}
+      restorableCategories={restorableTrashCategories}
       trashEntries={manualData.trash}
     />
   );
 
-  // Recordatorio: Para cualquier proceso en Java que gestione la configuración de estos iconos o estados de usuario, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
+  // Recordatorio: Para cualquier proceso en Java que gestione la configuraciÃ³n de estos iconos o estados de usuario, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
   const saveStatusLabel =
-    saveSyncState === 'error'
+    hasSaveConflict
+      ? 'Conflicto de guardado'
+      : saveSyncState === 'error'
       ? 'Error al guardar'
       : saveSyncState === 'pending'
         ? 'Pendiente de guardar'
@@ -3149,7 +3908,9 @@ export const App = () => {
             ? `Guardado a las ${lastSavedAt}`
             : 'Sin cambios';
   const saveStatusTone =
-    saveSyncState === 'error'
+    hasSaveConflict
+      ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200'
+      : saveSyncState === 'error'
       ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200'
       : saveSyncState === 'saved'
         ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
@@ -3168,6 +3929,45 @@ export const App = () => {
       : serverHealthState === 'offline'
         ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200'
         : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300';
+  const storageStatusLabel =
+    hasSaveConflict
+      ? 'Conflicto con otra sesión'
+      : saveSyncState === 'error'
+      ? 'Cambios aún no sincronizados'
+      : saveSyncState === 'saving' || saveSyncState === 'pending'
+        ? 'Pendiente de sincronizar con disco'
+        : manualOriginState === 'server'
+          ? 'Cargado desde disco'
+          : manualOriginState === 'local-storage'
+            ? 'Recuperado desde guardado local'
+            : 'Cargado desde base inicial';
+  const storageStatusTone =
+    hasSaveConflict
+      ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200'
+      : saveSyncState === 'error'
+      ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200'
+      : saveSyncState === 'saving' || saveSyncState === 'pending'
+        ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'
+        : manualOriginState === 'server'
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
+        : manualOriginState === 'local-storage'
+            ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200'
+            : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300';
+  const diagnosticsSnapshot: AppDiagnosticsSnapshot = {
+    approximateSizeKb: Math.max(1, Math.round(JSON.stringify(manualData).length / 1024)),
+    categoriesCount: manualData.categories.length,
+    dataOriginLabel: storageStatusLabel,
+    entriesCount: manualData.entries.length,
+    hasSaveConflict,
+    lastSavedAt,
+    redoDepth: redoStack.length,
+    revisionLabel: manualServerRevisionRef.current || 'sin revision remota',
+    saveStatusLabel,
+    serverStatusLabel,
+    templatesCount: manualData.templates.length,
+    trashCount: manualData.trash.length,
+    undoDepth: undoStack.length,
+  };
   const headerActions = (
     <>
       <div
@@ -3176,15 +3976,106 @@ export const App = () => {
         {serverStatusLabel}
       </div>
       <div
-        className={`hidden rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 lg:inline-flex ${saveStatusTone}`}
+        className={`hidden rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 lg:inline-flex ${storageStatusTone}`}
+      >
+        {storageStatusLabel}
+      </div>
+      <div
+        className={`hidden rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 xl:inline-flex ${saveStatusTone}`}
       >
         {saveStatusLabel}
       </div>
       <button
         type="button"
+        onClick={() => {
+          void reloadManualFromServer();
+        }}
+        aria-label="Recargar desde disco"
+        title="Recargar desde disco"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          className="h-5 w-5"
+        >
+          <path
+            d="M16 10a6 6 0 1 1-1.3-3.8M16 4v4h-4"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        onClick={handleUndoRecentChange}
+        aria-label="Deshacer ultimo cambio"
+        title={
+          undoStack.length
+            ? 'Deshacer ultimo cambio'
+            : 'No hay cambios recientes para deshacer'
+        }
+        disabled={!undoStack.length}
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white transition-colors dark:bg-slate-900 ${
+          undoStack.length
+            ? 'border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white'
+            : 'cursor-not-allowed border-slate-200/70 text-slate-300 dark:border-slate-800 dark:text-slate-700'
+        }`}
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          className="h-5 w-5"
+        >
+          <path
+            d="M7 6 3.5 9.5 7 13M4 9.5h6.25a4.25 4.25 0 1 1 0 8.5H8.5"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.6"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        onClick={handleRedoRecentChange}
+        aria-label="Rehacer ultimo cambio"
+        title={
+          redoStack.length
+            ? 'Rehacer ultimo cambio'
+            : 'No hay cambios deshechos para rehacer'
+        }
+        disabled={!redoStack.length}
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white transition-colors dark:bg-slate-900 ${
+          redoStack.length
+            ? 'border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white'
+            : 'cursor-not-allowed border-slate-200/70 text-slate-300 dark:border-slate-800 dark:text-slate-700'
+        }`}
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          className="h-5 w-5"
+        >
+          <path
+            d="m13 6 3.5 3.5L13 13M16 9.5H9.75a4.25 4.25 0 1 0 0 8.5h1.75"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.6"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
         onClick={handleOpenSettingsView}
-        aria-label="Abrir configuracion general"
-        title="Abrir configuracion general"
+        aria-label="Abrir configuración general"
+        title="Abrir configuración general"
         className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white transition-colors dark:bg-slate-900 ${
           activeView === 'settings'
             ? 'border-sky-400/70 text-sky-600 shadow-[0_0_0_4px_rgba(14,165,233,0.12)] dark:border-sky-400/50 dark:text-sky-300'
@@ -3270,6 +4161,7 @@ export const App = () => {
           {activeView === 'settings' ? (
             <AppCustomizationPanel
               customization={customization}
+              diagnostics={diagnosticsSnapshot}
               onCancel={() => setActiveView('home')}
               onSave={handleSaveCustomization}
             />
@@ -3302,9 +4194,23 @@ export const App = () => {
                         Seccion activa: {activeResultCategory.name}
                       </span>
                     ) : null}
-                    {activeTagFilter ? (
+                    {activeTagFilters.length ? (
                       <span className="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-200">
-                        Tag activo: #{activeTagFilter}
+                        Tags activos: {activeTagFilters.map((tag) => `#${tag}`).join(', ')}
+                      </span>
+                    ) : null}
+                    {showPinnedOnly ? (
+                      <span className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
+                        Solo ancladas
+                      </span>
+                    ) : null}
+                    {resultSortMode !== 'pinned-latest' ? (
+                      <span className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                        Orden: {resultSortMode === 'latest'
+                          ? 'Mas recientes'
+                          : resultSortMode === 'oldest'
+                            ? 'Mas antiguas'
+                            : 'Título'}
                       </span>
                     ) : null}
                     <button
@@ -3314,34 +4220,78 @@ export const App = () => {
                     >
                       Limpiar filtro
                     </button>
+                    {quickViews.map((quickView) => (
+                      <button
+                        key={quickView.id}
+                        type="button"
+                        onClick={() => applyQuickView(quickView)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          isQuickViewActive(quickView)
+                            ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900'
+                            : getQuickViewToneClass(quickView.tone)
+                        }`}
+                      >
+                        {quickView.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {activeResultCategory ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                    <span>Ordenar</span>
+                    <select
+                      value={resultSortMode}
+                      onChange={(event) =>
+                        setResultSortMode(event.target.value as ResultSortMode)
+                      }
+                      className="bg-transparent text-sm outline-none"
+                    >
+                      <option value="pinned-latest">Ancladas + recientes</option>
+                      <option value="latest">Mas recientes</option>
+                      <option value="oldest">Mas antiguas</option>
+                      <option value="title">Título</option>
+                    </select>
+                  </label>
+
                   <button
                     type="button"
-                    onClick={() =>
-                      openCreateEntryModal(activeResultCategory.name, true)
-                    }
-                    className="section-gradient-pill inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:text-slate-900 dark:text-slate-100 dark:hover:text-white"
-                    style={activeResultThemeVars}
+                    onClick={() => setShowPinnedOnly((currentValue) => !currentValue)}
+                    className={`rounded-2xl border px-4 py-2 text-sm font-medium transition-colors ${
+                      showPinnedOnly
+                        ? 'border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-400/50 dark:bg-amber-500/10 dark:text-amber-200'
+                        : 'border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200'
+                    }`}
                   >
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      className="h-5 w-5"
-                    >
-                      <path
-                        d="M10 4v12M4 10h12"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeWidth="1.8"
-                      />
-                    </svg>
-                    Añadir Ficha a {activeResultCategory.name}
+                    {showPinnedOnly ? 'Ver todas' : 'Solo ancladas'}
                   </button>
-                ) : null}
+
+                  {activeResultCategory ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openCreateEntryModal(activeResultCategory.name, true)
+                      }
+                      className="section-gradient-pill inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:text-slate-900 dark:text-slate-100 dark:hover:text-white"
+                      style={activeResultThemeVars}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        className="h-5 w-5"
+                      >
+                        <path
+                          d="M10 4v12M4 10h12"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeWidth="1.8"
+                        />
+                      </svg>
+                      Añadir ficha a {activeResultCategory.name}
+                    </button>
+                  ) : null}
+                </div>
               </div>
               </div>
 
@@ -3352,7 +4302,7 @@ export const App = () => {
 
                     return (
                       <ResultCard
-                        activeTag={activeTagFilter}
+                        activeTags={activeTagFilters}
                         key={entry.id}
                         categoryColorKey={category?.color}
                         entry={entry}
@@ -3370,11 +4320,11 @@ export const App = () => {
               ) : (
                 <div className="app-surface-shell rounded-[1.8rem] border border-dashed border-slate-300 px-4 py-8 text-center shadow-sm dark:border-slate-700 sm:px-6 sm:py-10">
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    No hemos encontrado resultados
+                    No hemos encontrado coincidencias
                   </h3>
                   <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                    Prueba con otra palabra clave, una categoria o usa prefijos
-                    como <code>/env</code> o <code>/cmd</code>.
+                    Prueba con otra palabra clave, cambia los filtros o usa
+                    prefijos como <code>/env</code> o <code>/cmd</code>.
                   </p>
                 </div>
               )}
@@ -3418,6 +4368,22 @@ export const App = () => {
                       <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 shadow-sm dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-200">
                         Plantillas reutilizables
                       </span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2.5">
+                      {quickViews.map((quickView) => (
+                        <button
+                          key={quickView.id}
+                          type="button"
+                          onClick={() => applyQuickView(quickView)}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors ${
+                            isQuickViewActive(quickView)
+                              ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900'
+                              : getQuickViewToneClass(quickView.tone)
+                          }`}
+                        >
+                          {quickView.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
@@ -3515,15 +4481,15 @@ export const App = () => {
               {quickAccessEntries.length ? (
                 <section className="mt-6">
                   <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
-                    Acceso Rápido
+                    Acceso rápido
                   </h3>
                   <div className="mt-3 grid gap-4">
                     {quickAccessEntries.map((entry) => {
                       const category = categoryMap.get(entry.categoria.toLowerCase());
 
                       return (
-                        <ResultCard
-                          activeTag={activeTagFilter}
+                      <ResultCard
+                          activeTags={activeTagFilters}
                           key={entry.id}
                           categoryColorKey={category?.color}
                           entry={entry}
@@ -3564,8 +4530,8 @@ export const App = () => {
                             </h4>
                             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                               {template.categoria
-                                ? `Seccion sugerida: ${template.categoria}`
-                                : 'Reusable en distintas secciones'}
+                                ? `Sección sugerida: ${template.categoria}`
+                                : 'Reutilizable en distintas secciones'}
                             </p>
                           </div>
                           <span className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
@@ -3646,8 +4612,8 @@ export const App = () => {
                         <button
                           type="button"
                           onClick={() => openCategoryModal(category.name)}
-                          aria-label={`Editar seccion ${category.name}`}
-                          title={`Editar seccion ${category.name}`}
+                          aria-label={`Editar sección ${category.name}`}
+                          title={`Editar sección ${category.name}`}
                           className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current transition-colors hover:bg-white dark:bg-slate-950/80 dark:hover:bg-slate-900"
                         >
                           <svg
@@ -3691,6 +4657,168 @@ export const App = () => {
           event.target.value = '';
         }}
       />
+
+      {backupImportState ? (
+        <div className="modal-overlay fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="modal-shell w-full max-w-2xl rounded-3xl border border-slate-200 p-5 shadow-2xl dark:border-slate-800">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Revisar backup antes de importar
+                </h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
+                  Revisa el contenido detectado y decide si quieres fusionarlo con
+                  lo actual o reemplazar por completo el estado cargado.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeBackupImportModal}
+                aria-label="Cerrar modal de importacion"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
+              >
+                X
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+                  Archivo analizado
+                </p>
+                <p className="mt-2 text-sm font-medium text-slate-800 dark:text-slate-100">
+                  {backupImportState.fileName}
+                </p>
+                <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                  <p>
+                    {backupImportState.importedManualData.categories.length} secciones
+                  </p>
+                  <p>{backupImportState.importedManualData.entries.length} fichas</p>
+                  <p>
+                    {backupImportState.importedManualData.templates.length} plantillas
+                  </p>
+                  <p>{backupImportState.importedManualData.trash.length} en papelera</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {backupImportSummary ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+                      Impacto estimado
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-400/20 dark:bg-emerald-500/10">
+                        <p className="font-semibold text-emerald-800 dark:text-emerald-200">
+                          {backupImportSummary.newEntries}
+                        </p>
+                        <p className="text-emerald-700 dark:text-emerald-300">fichas nuevas</p>
+                      </div>
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-400/20 dark:bg-emerald-500/10">
+                        <p className="font-semibold text-emerald-800 dark:text-emerald-200">
+                          {backupImportSummary.newTemplates}
+                        </p>
+                        <p className="text-emerald-700 dark:text-emerald-300">plantillas nuevas</p>
+                      </div>
+                      <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 dark:border-sky-400/20 dark:bg-sky-500/10">
+                        <p className="font-semibold text-sky-800 dark:text-sky-200">
+                          {backupImportSummary.newCategories}
+                        </p>
+                        <p className="text-sky-700 dark:text-sky-300">secciones nuevas</p>
+                      </div>
+                      <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 dark:border-sky-400/20 dark:bg-sky-500/10">
+                        <p className="font-semibold text-sky-800 dark:text-sky-200">
+                          {backupImportSummary.newTrashEntries}
+                        </p>
+                        <p className="text-sky-700 dark:text-sky-300">entradas en papelera</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                      <p>
+                        Coincidencias de sección: {backupImportSummary.matchingCategories}
+                      </p>
+                      <p>
+                        Coincidencias por ID de ficha: {backupImportSummary.conflictingEntryIds}
+                      </p>
+                      <p>
+                        Coincidencias por título de ficha: {backupImportSummary.conflictingEntryTitles}
+                      </p>
+                      <p>
+                        Coincidencias por ID de plantilla: {backupImportSummary.conflictingTemplateIds}
+                      </p>
+                      <p>
+                        Coincidencias por nombre/título de plantilla:{' '}
+                        {backupImportSummary.conflictingTemplateNames +
+                          backupImportSummary.conflictingTemplateTitles}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyImportedManualData(
+                      backupImportState.importedManualData,
+                      'merge',
+                    )
+                  }
+                  className="w-full rounded-2xl border border-sky-500 bg-sky-500/10 px-4 py-4 text-left transition-colors hover:border-sky-600 hover:bg-sky-500/15 dark:border-sky-400/50 dark:hover:border-sky-300"
+                >
+                  <span className="block text-sm font-semibold text-sky-800 dark:text-sky-200">
+                    Fusionar con lo actual
+                  </span>
+                  <span className="mt-1 block text-sm text-slate-600 dark:text-slate-300">
+                    Conserva lo que ya tienes y combina fichas, secciones,
+                    plantillas y papelera. Si hay coincidencias por ID, prevalece
+                    el contenido del backup.
+                  </span>
+                  {backupImportSummary ? (
+                    <span className="mt-2 block text-xs text-sky-700 dark:text-sky-300">
+                      Añadirá {backupImportSummary.newEntries} fichas nuevas y
+                      actualizará {backupImportSummary.conflictingEntryIds} por ID.
+                    </span>
+                  ) : null}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyImportedManualData(
+                      backupImportState.importedManualData,
+                      'replace',
+                    )
+                  }
+                  className="w-full rounded-2xl border border-amber-500 bg-amber-500/10 px-4 py-4 text-left transition-colors hover:border-amber-600 hover:bg-amber-500/15 dark:border-amber-400/50 dark:hover:border-amber-300"
+                >
+                  <span className="block text-sm font-semibold text-amber-800 dark:text-amber-200">
+                    Reemplazar el estado actual
+                  </span>
+                  <span className="mt-1 block text-sm text-slate-600 dark:text-slate-300">
+                    Sustituye por completo el estado actual por el contenido del backup.
+                  </span>
+                  {backupImportSummary ? (
+                    <span className="mt-2 block text-xs text-amber-700 dark:text-amber-300">
+                      Dejará el sistema con {backupImportState.importedManualData.entries.length}{' '}
+                      fichas y {backupImportState.importedManualData.categories.length}{' '}
+                      secciones procedentes del archivo importado.
+                    </span>
+                  ) : null}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={closeBackupImportModal}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-200 hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {saveToast ? (
         <div className="modal-shell fixed bottom-4 right-4 z-[80] max-w-sm rounded-2xl border border-slate-200 px-4 py-3 shadow-lg dark:border-slate-700">
@@ -3756,7 +4884,7 @@ export const App = () => {
                           Contexto de la ficha
                         </p>
                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
-                          Define seccion, metadatos y soporte operativo antes de redactar el documento.
+                          Define sección, metadatos y soporte operativo antes de redactar el documento.
                         </p>
                       </div>
 
@@ -3806,7 +4934,7 @@ export const App = () => {
                           >
                             <option value="">
                               {manualData.categories.length
-                                ? 'Selecciona una seccion'
+                                ? 'Selecciona una sección'
                                 : 'No hay secciones creadas'}
                             </option>
                             {manualData.categories.map((category) => (
@@ -3833,7 +4961,7 @@ export const App = () => {
                         </label>
 
                         <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                          Titulo
+                          Título
                           <input
                             value={entryForm.titulo}
                             onChange={(event) =>
@@ -3857,37 +4985,37 @@ export const App = () => {
                               }))
                             }
                             className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                            placeholder="oracle, produccion, incidencia, rga"
+                            placeholder="oracle, producción, incidencia, rga"
                           />
                           <p className="text-xs font-normal leading-5 text-slate-500 dark:text-slate-400">
-                            Usa de 2 a 5 tags cortos para busqueda, separados por comas. Convencion recomendada: tecnologia, entorno, tipo de tarea y sistema o negocio. Ejemplo: oracle, produccion, incidencia, rga.
+                            Usa de 2 a 5 tags cortos para búsqueda, separados por comas. Convención recomendada: tecnología, entorno, tipo de tarea y sistema o negocio. Ejemplo: oracle, producción, incidencia, rga.
                           </p>
                         </label>
                       </div>
 
                       {entryForm.categoryLocked && activeEntryCategory ? (
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-                          La nueva ficha se añadira dentro de la seccion{' '}
+                          La nueva ficha se añadirá dentro de la sección{' '}
                           <span className="font-semibold text-slate-900 dark:text-slate-100">
                             {activeEntryCategory.name}
                           </span>
-                          . Para cambiarla, vuelve a la Home y entra desde otra seccion.
+                          . Para cambiarla, vuelve a la Home y entra desde otra sección.
                         </div>
                       ) : !manualData.categories.length ? (
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                          Antes de crear fichas necesitas al menos una seccion. Crea la seccion desde la Home y luego vuelve aqui.
+                          Antes de crear fichas necesitas al menos una sección. Crea la sección desde la Home y luego vuelve aquí.
                         </div>
                       ) : !activeEntryCategory ? (
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                          Selecciona una seccion existente para que la ficha quede bien organizada.
+                          Selecciona una sección existente para que la ficha quede bien organizada.
                         </div>
                       ) : activeEntryCategory ? (
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-                          La ficha se guardara dentro de la seccion{' '}
+                          La ficha se guardará dentro de la sección{' '}
                           <span className="font-semibold text-slate-900 dark:text-slate-100">
                             {activeEntryCategory.name}
                           </span>
-                          , con la descripcion actual de la Home.
+                          , con la descripción actual de la Home.
                         </div>
                       ) : null}
                     </section>
@@ -3979,7 +5107,7 @@ export const App = () => {
                             );
                           }}
                           className={`themed-field min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white ${isUploadingImage ? 'cursor-wait' : ''}`}
-                          placeholder="# Titulo de seccion&#10;&#10;Escribe aqui tu documentacion en Markdown..."
+                          placeholder="# Título de sección&#10;&#10;Escribe aquí tu documentación en Markdown..."
                         />
                       </div>
                     </section>
@@ -4004,7 +5132,7 @@ export const App = () => {
                       <div className="space-y-3">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Comandos y parametros
+                            Comandos y parámetros
                           </p>
                           <button
                             type="button"
@@ -4104,7 +5232,7 @@ export const App = () => {
                     <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                       <div className="flex flex-wrap items-center gap-3">
                         <span className="section-gradient-pill inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 dark:text-slate-100" style={entryThemeVars}>
-                          {entryForm.categoria || 'Sin categoria'}
+                          {entryForm.categoria || 'Sin categoría'}
                         </span>
                         <span className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
                           {entryForm.id || 'id-pendiente'}
@@ -4138,7 +5266,7 @@ export const App = () => {
                     ) ? (
                       <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          Comandos y parametros
+                          Comandos y parámetros
                         </h3>
                         <div className="mt-3 space-y-2">
                           {entryForm.comandos
@@ -4179,10 +5307,10 @@ export const App = () => {
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                       {modalState.mode === 'create'
                         ? 'Nueva sección'
-                        : 'Editar seccion'}
+                        : 'Editar sección'}
                     </h3>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      Configura el nombre, color y descripcion del bloque principal de la Home.
+                      Configura el nombre, el color y la descripción del bloque principal de la Home.
                     </p>
                   </div>
 
@@ -4199,7 +5327,7 @@ export const App = () => {
                 <div className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
                   <section className="grid gap-4 md:grid-cols-2">
                     <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Nombre de la seccion
+                      Nombre de la sección
                       <input
                         value={categoryForm?.name ?? ''}
                         onChange={(event) =>
@@ -4238,7 +5366,7 @@ export const App = () => {
                     </label>
 
                     <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                      Descripcion de la Home
+                      Descripción de la Home
                       <textarea
                         value={categoryForm?.description ?? ''}
                         onChange={(event) =>
@@ -4313,7 +5441,7 @@ export const App = () => {
                     aria-label="Cerrar modal"
                     className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
                   >
-                    X
+                    ×
                   </button>
                 </div>
 
@@ -4391,7 +5519,7 @@ export const App = () => {
                           )
                         }
                         className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                        placeholder="batch, incidencia, produccion"
+                        placeholder="batch, incidencia, producción"
                       />
                     </label>
 

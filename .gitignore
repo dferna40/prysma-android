@@ -1,11 +1,13 @@
 # Dependencias de Node
 node_modules/
 
-# Build de producción
+# Build de produccion
 dist/
 dist-ssr/
+release/
+release-*/
 
-# Caché de Vite
+# Cache de Vite
 .vite/
 node_modules/.vite/
 
@@ -22,7 +24,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Caché
+# Cache
 .cache/
 .parcel-cache/
 
@@ -44,3 +46,10 @@ Thumbs.db
 # Vercel / Netlify
 .vercel/
 .netlify/
+
+# Runtime local y datos generados
+.runtime/
+*.pid
+backups/
+tmp-userdata/
+public/images/

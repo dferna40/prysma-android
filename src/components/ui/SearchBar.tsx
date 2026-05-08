@@ -1,6 +1,12 @@
 import { useMemo, useState } from 'react';
 
-const PREFIXES = ['/cmd', '/env', '/db', '/uml', '/task'];
+const PREFIXES = [
+  { description: 'Fichas con comandos reutilizables', value: '/cmd' },
+  { description: 'Entornos, URLs, hosts y accesos tecnicos', value: '/env' },
+  { description: 'SQL, tablas, Oracle y fichas de base de datos', value: '/db' },
+  { description: 'Modelado, MagicDraw y protocolos UML', value: '/uml' },
+  { description: 'Procedimientos, pasos y checklists', value: '/task' },
+];
 
 interface SearchBarProps {
   value: string;
@@ -21,7 +27,7 @@ export function SearchBar({
     const normalizedValue = value.trim().toLowerCase();
 
     return PREFIXES.filter((prefix) =>
-      prefix.toLowerCase().startsWith(normalizedValue),
+      prefix.value.toLowerCase().startsWith(normalizedValue),
     );
   }, [value]);
 
@@ -56,13 +62,16 @@ export function SearchBar({
           </p>
           <ul className="space-y-1">
             {filteredPrefixes.map((prefix) => (
-              <li key={prefix}>
+              <li key={prefix.value}>
                 <button
                   type="button"
-                  onClick={() => onChange(`${prefix} `)}
+                  onClick={() => onChange(`${prefix.value} `)}
                   className="w-full rounded-lg px-2 py-1 text-left text-sm text-slate-800 transition-all duration-200 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800"
                 >
-                  {prefix}
+                  <span className="block font-medium">{prefix.value}</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">
+                    {prefix.description}
+                  </span>
                 </button>
               </li>
             ))}

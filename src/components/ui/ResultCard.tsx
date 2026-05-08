@@ -9,7 +9,7 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import type { CategoryColorKey, KnowledgeEntry } from '../../types';
 
 interface ResultCardProps {
-  activeTag?: string;
+  activeTags?: string[];
   categoryColorKey?: CategoryColorKey;
   entry: KnowledgeEntry;
   onCommandSave: (
@@ -27,6 +27,10 @@ interface ResultCardProps {
 
 const healthLabelPattern = /\b(url|endpoint|host)\b/i;
 const sensitiveLabelPattern = /\b(password|pass|clave)\b/i;
+type HealthCheckStatus = {
+  detail?: string;
+  state: 'checking' | 'healthy' | 'error';
+};
 
 // Recordatorio: Para cualquier proceso en Java que gestione la configuración de estos iconos o estados de usuario, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
 const actionButtonBaseClass =
@@ -37,6 +41,8 @@ const isHealthCheckLabel = (label: string) => healthLabelPattern.test(label);
 const isSensitiveLabel = (label: string) => sensitiveLabelPattern.test(label);
 
 const maskValue = (value: string) => '*'.repeat(Math.max(value.length, 8));
+const isFieldVisible = (fieldKey: string, sensitive: boolean, hiddenFields: Record<string, boolean>) =>
+  !sensitive || hiddenFields[fieldKey] === true;
 const buildCollapsedPreview = (content: string) =>
   content
     .replace(/```[\s\S]*?```/g, ' [codigo] ')
@@ -70,11 +76,29 @@ const normalizeHealthTarget = (value: string) => {
     return trimmedValue;
   }
 
+  if (/^(localhost|127\.0\.0\.1|\[::1\]|::1)(?::\d+)?(\/.*)?$/i.test(trimmedValue)) {
+    return `http://${trimmedValue.replace(/^\[::1\]/i, '::1')}`;
+  }
+
   if (/^[a-z0-9.-]+(?::\d+)?(\/.*)?$/i.test(trimmedValue)) {
     return `https://${trimmedValue}`;
   }
 
   return null;
+};
+
+const getApiBaseUrl = () => {
+  if (typeof window === 'undefined') {
+    return 'http://localhost:3001';
+  }
+
+  const { origin } = window.location;
+
+  if (/localhost:517\d|127\.0\.0\.1:517\d/.test(origin)) {
+    return 'http://localhost:3001';
+  }
+
+  return origin;
 };
 
 const hexToRgba = (hex: string, alpha: number) => {
@@ -109,7 +133,7 @@ const getCommandValueTone = (value: string) => {
 };
 
 export function ResultCard({
-  activeTag,
+  activeTags = [],
   categoryColorKey = 'slate',
   entry,
   onCommandSave,
@@ -124,9 +148,7 @@ export function ResultCard({
   const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>({});
   const [editingFields, setEditingFields] = useState<Record<string, boolean>>({});
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
-  const [healthStatuses, setHealthStatuses] = useState<
-    Record<string, 'checking' | 'healthy' | 'error'>
-  >({});
+  const [healthStatuses, setHealthStatuses] = useState<Record<string, HealthCheckStatus>>({});
 
   const categoryStyle = getCategoryTheme(categoryColorKey);
   const categoryColor = getCategoryColorHex(categoryColorKey);
@@ -156,30 +178,67 @@ export function ResultCard({
     if (!targetUrl) {
       setHealthStatuses((current) => ({
         ...current,
-        [commandLabel]: 'error',
+        [commandLabel]: {
+          detail: 'URL no valida',
+          state: 'error',
+        },
       }));
       return;
     }
 
     setHealthStatuses((current) => ({
       ...current,
-      [commandLabel]: 'checking',
+      [commandLabel]: {
+        detail: `Comprobando ${targetUrl}`,
+        state: 'checking',
+      },
     }));
 
     try {
-      await fetch(targetUrl, {
-        method: 'GET',
-        mode: 'no-cors',
-      });
+      const response = await fetch(
+        `${getApiBaseUrl()}/check-endpoint?url=${encodeURIComponent(targetUrl)}`,
+        {
+          method: 'GET',
+        },
+      );
+      const result = (await response.json()) as {
+        ok?: boolean;
+        reason?: string;
+        status?: number;
+        statusText?: string;
+        url?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(result.reason ?? 'request-failed');
+      }
 
       setHealthStatuses((current) => ({
         ...current,
-        [commandLabel]: 'healthy',
+        [commandLabel]: result.ok
+          ? {
+              detail: result.status
+                ? `Activo (${result.status}${result.statusText ? ` ${result.statusText}` : ''})`
+                : 'Activo',
+              state: 'healthy',
+            }
+          : {
+              detail:
+                result.reason === 'request-failed'
+                  ? 'No se pudo conectar'
+                  : result.status
+                  ? `Respondio ${result.status}${result.statusText ? ` ${result.statusText}` : ''}`
+                    : 'Inaccesible',
+              state: 'error',
+            },
       }));
     } catch {
       setHealthStatuses((current) => ({
         ...current,
-        [commandLabel]: 'error',
+        [commandLabel]: {
+          detail: 'No se pudo validar con el servidor',
+          state: 'error',
+        },
       }));
     }
   };
@@ -262,7 +321,7 @@ export function ResultCard({
                   type="button"
                   onClick={() => onTagClick?.(tag)}
                   className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium lowercase transition-colors ${
-                    activeTag === tag.toLowerCase()
+                    activeTags.includes(tag.toLowerCase())
                       ? 'border-sky-400 bg-sky-100 text-sky-800 dark:border-sky-400/70 dark:bg-sky-500/20 dark:text-sky-200'
                       : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-sky-500/50 dark:hover:bg-sky-500/10 dark:hover:text-sky-300'
                   }`}
@@ -492,7 +551,8 @@ export function ResultCard({
                 {entry.comandos.map((command, index) => {
                   const fieldKey = `${entry.id}-${command.label}-${index}`;
                   const sensitive = isSensitiveLabel(command.label);
-                  const isHidden = sensitive && hiddenFields[fieldKey];
+                  const visible = isFieldVisible(fieldKey, sensitive, hiddenFields);
+                  const isHidden = sensitive && !visible;
                   const isEditing = Boolean(editingFields[fieldKey]);
                   const draftValue = draftValues[fieldKey] ?? command.value;
                   const displayedValue = isHidden
@@ -523,7 +583,7 @@ export function ResultCard({
                       >
                         {isEditing ? (
                           <input
-                            type={sensitive && isHidden ? 'password' : 'text'}
+                            type={sensitive && !visible ? 'password' : 'text'}
                             value={draftValue}
                             onChange={(event) =>
                               setDraftValues((current) => ({
@@ -554,18 +614,19 @@ export function ResultCard({
                             onClick={() => runHealthCheck(command.label, command.value)}
                             aria-label={`Comprobar ${command.label}`}
                             title={
-                              healthStatuses[command.label] === 'healthy'
+                              healthStatuses[command.label]?.detail ??
+                              (healthStatuses[command.label]?.state === 'healthy'
                                 ? 'Activo'
-                                : healthStatuses[command.label] === 'error'
+                                : healthStatuses[command.label]?.state === 'error'
                                   ? 'Inaccesible'
-                                  : healthStatuses[command.label] === 'checking'
+                                  : healthStatuses[command.label]?.state === 'checking'
                                     ? 'Comprobando'
-                                    : 'Lanzar health check'
+                                    : 'Lanzar health check')
                             }
                             className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-white transition-colors dark:bg-slate-950 ${
-                              healthStatuses[command.label] === 'healthy'
+                              healthStatuses[command.label]?.state === 'healthy'
                                 ? 'border-emerald-200 text-emerald-600 dark:border-emerald-900/40 dark:text-emerald-400'
-                                : healthStatuses[command.label] === 'error'
+                                : healthStatuses[command.label]?.state === 'error'
                                   ? 'border-red-200 text-red-600 dark:border-red-900/40 dark:text-red-400'
                                   : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white'
                             }`}
@@ -575,7 +636,7 @@ export function ResultCard({
                               viewBox="0 0 20 20"
                               fill="none"
                               className={`${actionIconClass} ${
-                                healthStatuses[command.label] === 'checking'
+                                healthStatuses[command.label]?.state === 'checking'
                                   ? 'animate-spin'
                                   : ''
                               }`}
