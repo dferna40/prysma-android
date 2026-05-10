@@ -1474,6 +1474,8 @@ export const App = () => {
   const [entryForm, setEntryForm] = useState<EntryFormState>(() =>
     buildEntryFormState(),
   );
+  const [debouncedEntryPreview, setDebouncedEntryPreview] =
+    useState<EntryFormState>(entryForm);
   const [categoryForm, setCategoryForm] = useState<CategoryFormState | null>(
     null,
   );
@@ -1844,6 +1846,21 @@ export const App = () => {
       window.clearTimeout(timeoutId);
     };
   }, [searchTerm]);
+
+  useEffect(() => {
+    if (modalState?.type !== 'entry') {
+      setDebouncedEntryPreview(entryForm);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedEntryPreview(entryForm);
+    }, 180);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [entryForm, modalState]);
 
   useEffect(() => {
     if (!saveToast) {
@@ -6740,36 +6757,36 @@ export const App = () => {
                     <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                       <div className="flex flex-wrap items-center gap-3">
                         <span className="section-gradient-pill inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 dark:text-slate-100" style={entryThemeVars}>
-                          {entryForm.categoria || 'Sin categoría'}
+                          {debouncedEntryPreview.categoria || 'Sin categoría'}
                         </span>
                         <span className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
-                          {entryForm.id || 'id-pendiente'}
+                          {debouncedEntryPreview.id || 'id-pendiente'}
                         </span>
                       </div>
 
                       <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                        {entryForm.titulo || 'Vista previa de la ficha'}
+                        {debouncedEntryPreview.titulo || 'Vista previa de la ficha'}
                       </h2>
 
                       <div className="mt-4 text-sm leading-6 text-slate-700 dark:text-slate-200">
-                        <MarkdownRenderer content={entryForm.contenido} />
+                        <MarkdownRenderer content={debouncedEntryPreview.contenido} />
                       </div>
                     </div>
 
-                    {splitLines(entryForm.pasos).length ? (
+                    {splitLines(debouncedEntryPreview.pasos).length ? (
                       <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                           Pasos
                         </h3>
                         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
-                          {splitLines(entryForm.pasos).map((step) => (
+                          {splitLines(debouncedEntryPreview.pasos).map((step) => (
                             <li key={step}>{step}</li>
                           ))}
                         </ol>
                       </div>
                     ) : null}
 
-                    {entryForm.comandos.some(
+                    {debouncedEntryPreview.comandos.some(
                       (command) => command.label.trim() || command.value.trim(),
                     ) ? (
                       <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
@@ -6777,7 +6794,7 @@ export const App = () => {
                           Comandos y parámetros
                         </h3>
                         <div className="mt-3 space-y-2">
-                          {entryForm.comandos
+                          {debouncedEntryPreview.comandos
                             .filter(
                               (command) =>
                                 command.label.trim() || command.value.trim(),
