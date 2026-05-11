@@ -37,39 +37,154 @@
       "id": "demo-primeros-pasos",
       "titulo": "Primeros pasos en Prysma",
       "categoria": "General",
-      "contenido": "Usa esta ficha como punto de partida para documentar procesos, accesos y procedimientos de tu equipo.\n\n## Recomendacion\nPersonaliza el manual con tus categorias y elimina esta ficha cuando ya no la necesites.",
+      "contenido": "Bienvenido a Prysma. Esta base inicial te muestra una forma practica de organizar conocimiento tecnico por secciones, fichas y plantillas.\n\n## Que vas a encontrar\n- Fichas de ejemplo por seccion.\n- Plantillas reutilizables para acelerar nuevas entradas.\n- Filtros rapidos para navegar por contenido frecuente.\n\n## Como usar la app\n1. Revisa las fichas ancladas para entender la estructura.\n2. Entra en Plantillas si quieres crear contenido repetible.\n3. Edita cualquier ficha pulsando directamente sobre ella.\n4. Personaliza categorias, filtros rapidos y textos desde Ajustes.\n\n## Siguiente paso recomendado\nDuplica una plantilla, cambia el contenido y guarda tu primera ficha real.",
       "pasos": [
-        "Crea o edita una seccion desde la Home.",
-        "Añade fichas con contenido, pasos, tags y comandos.",
-        "Exporta a PDF cuando necesites compartir una guia."
+        "Revisa la ficha 'Como organizar el manual'.",
+        "Abre la pantalla de plantillas y usa una base existente.",
+        "Crea una ficha nueva en la seccion que mejor encaje.",
+        "Ancla solo lo que necesites consultar con frecuencia."
       ],
       "tags": [
         "bienvenida",
         "demo",
-        "manual"
+        "manual",
+        "onboarding"
       ],
       "comandos": [],
       "isPinned": true,
-      "updatedAt": "2026-05-09T00:30:00.000Z"
+      "updatedAt": "2026-05-11T09:00:00.000Z"
     },
     {
-      "id": "demo-java-try-catch-resources",
-      "titulo": "Estándar Java: try-catch-resources",
+      "id": "guia-organizacion-manual",
+      "titulo": "Como organizar el manual por secciones",
       "categoria": "General",
-      "contenido": "Para cualquier flujo Java que lea o escriba archivos, sockets o streams, utiliza siempre try-catch-resources para asegurar el cierre correcto de recursos y mejorar la estabilidad operativa.",
+      "contenido": "Cada seccion tiene un proposito distinto para que el manual siga siendo facil de buscar y mantener.\n\n| Seccion | Que guardar |\n| --- | --- |\n| Entorno | Rutas, endpoints, puertos, hosts, variables y notas de despliegue |\n| Accesos | Credenciales, portales, usuarios tecnicos y enlaces de acceso |\n| Batch | Jobs, tablas, consultas SQL, validaciones y pasos operativos |\n| UML | Normas de modelado, bloqueos, exportaciones y herramientas |\n| UI | Componentes, literales, flujos y notas de frontend |\n| General | Guias transversales, checklist y buenas practicas |\n\n## Regla simple\nSi una ficha solo sirve para un area concreta, guardala en su seccion. Si aplica a todo el equipo, usa General.",
       "pasos": [
-        "Encapsula FileInputStream, BufferedReader, InputStream o Writer dentro del bloque try-with-resources.",
-        "Gestiona las excepciones funcionales y técnicas con mensajes claros.",
-        "Documenta en la ficha cualquier prerequisito o dependencia."
+        "Crea primero la seccion si no existe.",
+        "Pon un titulo claro y facil de buscar.",
+        "Anade tags utiles para localizarla despues."
       ],
       "tags": [
-        "java",
-        "estandares",
-        "io"
+        "estructura",
+        "secciones",
+        "guia"
+      ],
+      "comandos": [],
+      "isPinned": true,
+      "updatedAt": "2026-05-11T09:05:00.000Z"
+    },
+    {
+      "id": "entorno-que-documentar",
+      "titulo": "Entorno: que conviene documentar",
+      "categoria": "Entorno",
+      "contenido": "Usa esta seccion para todo lo que ayude a levantar, validar o entender el entorno tecnico.\n\n## Ejemplos utiles\n- URL de aplicaciones y APIs.\n- Puertos locales y servicios auxiliares.\n- Rutas de proyectos, logs y configuracion.\n- Variables de entorno o prerequisitos de arranque.\n\n## Ejemplo de tabla\n| Recurso | Valor |\n| --- | --- |\n| Frontend local | http://localhost:5173 |\n| API local | http://localhost:3001 |\n| Carpeta de logs | C:/logs/prysma |",
+      "pasos": [
+        "Agrupa por entorno local, desarrollo, pre o produccion.",
+        "Evita mezclar aqui credenciales sensibles si tienen su propia ficha.",
+        "Manten actualizadas las rutas y puertos."
+      ],
+      "tags": [
+        "entorno",
+        "urls",
+        "rutas",
+        "puertos"
+      ],
+      "comandos": [
+        {
+          "label": "Servidor local",
+          "value": "npm run dev"
+        }
+      ],
+      "isPinned": false,
+      "updatedAt": "2026-05-11T09:10:00.000Z"
+    },
+    {
+      "id": "accesos-buenas-practicas",
+      "titulo": "Accesos: buenas practicas para documentar credenciales",
+      "categoria": "Accesos",
+      "contenido": "Esta seccion sirve para centralizar accesos operativos y enlaces tecnicos.\n\n## Recomendaciones\n- Usa una ficha por sistema o portal.\n- Separa usuario, password, URL y notas de acceso.\n- Si un dato cambia mucho, explica tambien como regenerarlo.\n\n## Estructura sugerida\n| Campo | Ejemplo |\n| --- | --- |\n| Portal | Backoffice de incidencias |\n| URL | https://portal.ejemplo.local |\n| Usuario | tecnico_batch |\n| Nota | Requiere VPN corporativa |",
+      "pasos": [
+        "No mezcles varios sistemas no relacionados en una sola ficha.",
+        "Usa tags por tecnologia o area de negocio.",
+        "Actualiza la ficha cuando cambien usuarios o enlaces."
+      ],
+      "tags": [
+        "accesos",
+        "credenciales",
+        "portales"
+      ],
+      "comandos": [
+        {
+          "label": "Portal",
+          "value": "https://portal.ejemplo.local"
+        }
+      ],
+      "isPinned": false,
+      "updatedAt": "2026-05-11T09:15:00.000Z"
+    },
+    {
+      "id": "batch-incidencia-checklist",
+      "titulo": "Batch: checklist base para una incidencia",
+      "categoria": "Batch",
+      "contenido": "Una ficha de Batch deberia ayudarte a entender rapido que fallo, donde mirar y como validarlo.\n\n## Checklist inicial\n- Job o proceso afectado.\n- Tabla, cola o servicio relacionado.\n- Ventana temporal del error.\n- Evidencia en logs, SQL o monitorizacion.\n- Validacion final tras la correccion.\n\n## Ejemplo de consulta\n```sql\nSELECT estado, fecha_ejecucion\nFROM job_ejecuciones\nWHERE nombre_job = 'CIERRE_DIARIO'\nORDER BY fecha_ejecucion DESC;\n```",
+      "pasos": [
+        "Identifica el job o proceso implicado.",
+        "Busca la ultima ejecucion correcta.",
+        "Documenta validacion y resultado final."
+      ],
+      "tags": [
+        "batch",
+        "incidencia",
+        "sql",
+        "checklist"
+      ],
+      "comandos": [
+        {
+          "label": "Consulta base",
+          "value": "SELECT * FROM job_ejecuciones WHERE nombre_job = 'CIERRE_DIARIO';"
+        }
+      ],
+      "isPinned": false,
+      "updatedAt": "2026-05-11T09:20:00.000Z"
+    },
+    {
+      "id": "uml-protocolo-bloqueos",
+      "titulo": "UML: protocolo rapido de trabajo compartido",
+      "categoria": "UML",
+      "contenido": "Usa esta seccion para documentar normas de modelado y trabajo colaborativo.\n\n## Que suele ir aqui\n- Pasos para hacer lock en repositorios compartidos.\n- Exportaciones, nomenclaturas y convenciones.\n- Reglas para no pisar trabajo de otros.\n\n## Recordatorio\nAntes de tocar un recurso compartido, deja constancia del lock, el alcance del cambio y la liberacion al terminar.",
+      "pasos": [
+        "Haz lock antes de editar.",
+        "Anota que vas a tocar.",
+        "Libera el recurso al terminar."
+      ],
+      "tags": [
+        "uml",
+        "lock",
+        "colaboracion"
       ],
       "comandos": [],
       "isPinned": false,
-      "updatedAt": "2026-05-09T00:30:00.000Z"
+      "updatedAt": "2026-05-11T09:25:00.000Z"
+    },
+    {
+      "id": "ui-guia-fichas-plantillas",
+      "titulo": "UI: diferencia entre ficha y plantilla",
+      "categoria": "UI",
+      "contenido": "En Prysma una ficha es contenido real ya documentado. Una plantilla es una base reutilizable para crear fichas parecidas mas rapido.\n\n## Cuando usar ficha\n- Tienes informacion concreta y definitiva.\n- Quieres guardar una solucion, acceso o procedimiento real.\n\n## Cuando usar plantilla\n- Repetis la misma estructura muchas veces.\n- Solo cambia el nombre del proceso, la SQL o una parte del contexto.\n\n## Consejo\nSi detectas que estas copiando y pegando una ficha varias veces, conviertela en plantilla.",
+      "pasos": [
+        "Crea plantillas para incidencias o checklist repetitivos.",
+        "Usa fichas para el conocimiento ya validado.",
+        "Marca como favorita la plantilla que mas uses."
+      ],
+      "tags": [
+        "ui",
+        "plantillas",
+        "fichas",
+        "uso"
+      ],
+      "comandos": [],
+      "isPinned": false,
+      "updatedAt": "2026-05-11T09:30:00.000Z"
     }
   ],
   "settings": {
@@ -77,22 +192,105 @@
       "appIconDataUrl": "",
       "appName": "Prysma",
       "backupSectionTitle": "Backup",
-      "companyUsersLabel": "Usuarios por Compañía",
-      "creatorCredit": "Creado por David Fernández Ramírez",
+      "companyUsersLabel": "Usuarios por Compania",
+      "creatorCredit": "Creado por David Fernandez Ramirez",
       "devToolsSectionTitle": "DevTools",
       "externalTools": [],
       "externalToolsTitle": "Herramientas externas",
       "globalPasswordLabel": "Password",
       "globalRgaTitle": "Global Prysma",
       "globalUserLabel": "Usuario",
-      "heroDescription": "Tu ecosistema de conocimiento para organizar guías de trabajo, accesos, procedimientos y documentación operativa.",
+      "heroDescription": "Tu ecosistema de conocimiento para organizar guias de trabajo, accesos, procedimientos y documentacion operativa.",
       "heroTitle": "Ecosistema de Conocimiento",
-      "reminderText": "Para cualquier implementación Java que gestione excepciones, utiliza siempre try-catch-resources para garantizar la seguridad del código.",
+      "reminderText": "Documenta lo repetible como plantilla y lo validado como ficha para mantener el manual claro y util.",
+      "showExternalTools": false,
+      "showGlobalCredentials": false,
+      "showSidebarIdentity": false,
       "sidebarIdentityTitle": "Escritorio",
       "trashSectionTitle": "Papelera"
     },
-    "darkMode": true
+    "darkMode": true,
+    "compactMode": false,
+    "quickViews": [
+      {
+        "categoryName": "Entorno",
+        "id": "quick-entorno",
+        "label": "Entorno",
+        "tone": "sky"
+      },
+      {
+        "categoryName": "Accesos",
+        "id": "quick-credenciales",
+        "label": "Credenciales",
+        "tone": "violet"
+      },
+      {
+        "id": "quick-incidencias",
+        "label": "Incidencias",
+        "searchTerm": "incidencia",
+        "tone": "amber"
+      },
+      {
+        "id": "quick-ancladas",
+        "label": "Ancladas",
+        "showPinnedOnly": true,
+        "tone": "emerald"
+      }
+    ]
   },
-  "templates": [],
+  "templates": [
+    {
+      "id": "plantilla-incidencia-batch",
+      "name": "Plantilla incidencia Batch",
+      "titulo": "Nueva incidencia Batch",
+      "categoria": "Batch",
+      "contenido": "## Contexto\nDescribe que proceso ha fallado, cuando se detecto y que impacto tiene.\n\n## Evidencias\n- Log o mensaje de error\n- Tabla o proceso implicado\n- Ultima ejecucion correcta\n\n## Analisis\nExplica la causa detectada o las hipotesis de trabajo.\n\n## Validacion\nIndica como comprobar que la incidencia ha quedado resuelta.",
+      "pasos": [
+        "Recoger evidencias",
+        "Analizar causa",
+        "Aplicar correccion",
+        "Validar resultado"
+      ],
+      "comandos": [
+        {
+          "label": "SQL base",
+          "value": "SELECT * FROM job_ejecuciones WHERE nombre_job = '';"
+        }
+      ],
+      "tags": [
+        "batch",
+        "incidencia",
+        "checklist"
+      ],
+      "isFavorite": true,
+      "updatedAt": "2026-05-11T09:35:00.000Z"
+    },
+    {
+      "id": "plantilla-acceso-tecnico",
+      "name": "Plantilla acceso tecnico",
+      "titulo": "Nuevo acceso tecnico",
+      "categoria": "Accesos",
+      "contenido": "## Sistema\nNombre del sistema o portal.\n\n## URL\nhttps://...\n\n## Credenciales\nDocumenta usuario, password o mecanismo de acceso.\n\n## Notas\nVPN, permisos, expiracion o dependencias relevantes.",
+      "pasos": [
+        "Indicar sistema",
+        "Guardar URL",
+        "Registrar credenciales",
+        "Anadir notas de acceso"
+      ],
+      "comandos": [
+        {
+          "label": "Portal",
+          "value": "https://..."
+        }
+      ],
+      "tags": [
+        "accesos",
+        "portal",
+        "credenciales"
+      ],
+      "isFavorite": true,
+      "updatedAt": "2026-05-11T09:40:00.000Z"
+    }
+  ],
   "trash": []
 }
