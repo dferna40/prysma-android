@@ -25,6 +25,8 @@ import {
   clipboardCopyEventName,
   type ClipboardCopyEventDetail,
 } from './utils/clipboard';
+import { manualStorage } from './services/manualStorage';
+import { runtimeBridge } from './services/runtimeBridge';
 import type {
   AppDiagnosticsSnapshot,
   AppSettings,
@@ -1956,16 +1958,12 @@ export const App = () => {
   useEffect(() => {
     let isCancelled = false;
 
-    const checkServerHealth = async () => {
+    const checkStorageHealth = async () => {
       try {
-        const response = await fetch(`${getApiBaseUrl()}/health`);
-
-        if (!response.ok) {
-          throw new Error('Servidor no disponible');
-        }
+        const isHealthy = await manualStorage.healthCheck();
 
         if (!isCancelled) {
-          setServerHealthState('online');
+          setServerHealthState(isHealthy ? 'online' : 'offline');
         }
       } catch {
         if (!isCancelled) {
@@ -1974,48 +1972,27 @@ export const App = () => {
       }
     };
 
-    void checkServerHealth();
-
-    const intervalId = window.setInterval(() => {
-      void checkServerHealth();
-    }, 20000);
+    void checkStorageHealth();
 
     return () => {
       isCancelled = true;
-      window.clearInterval(intervalId);
     };
   }, []);
 
   useEffect(() => {
     let isCancelled = false;
 
-    const loadManualFromServer = async () => {
+    const loadManualFromStorage = async () => {
       try {
-        const response = await fetch(`${getApiBaseUrl()}/manual`);
-
-        if (!response.ok) {
-          throw new Error('No se pudo cargar el manual inicial.');
-        }
-
-        const payload = (await response.json()) as
-          | { data?: unknown; revision?: string }
-          | ManualData;
-        const serverManual = normalizeManualData(
-          payload && typeof payload === 'object' && 'data' in payload
-            ? payload.data
-            : payload,
-        );
-        const revision =
-          payload && typeof payload === 'object' && 'revision' in payload
-            ? payload.revision
-            : '';
+        const result = await manualStorage.loadManual();
+        const serverManual = normalizeManualData(result.data);
 
         if (!isCancelled) {
           persistManualData(serverManual);
           setManualData(serverManual);
-          manualServerRevisionRef.current = typeof revision === 'string' ? revision : '';
+          manualServerRevisionRef.current = result.revision;
           setHasSaveConflict(false);
-          setManualOriginState('server');
+          setManualOriginState(result.source);
           setUndoStack([]);
           setRedoStack([]);
           setServerHealthState('online');
@@ -2029,20 +2006,20 @@ export const App = () => {
       }
     };
 
-    void loadManualFromServer();
+    void loadManualFromStorage();
 
     return () => {
       isCancelled = true;
     };
   }, []);
 
-  const reloadManualFromServer = async () => {
+  const reloadManualFromStorage = async () => {
     const hasUnsyncedChanges =
       hasSaveConflict || saveSyncState === 'error' || saveSyncState === 'pending';
 
     if (hasUnsyncedChanges) {
       const confirmed = window.confirm(
-        'Hay cambios locales pendientes o en conflicto. Si recargas desde disco, se sustituira el estado actual por el del servidor. ¿Quieres continuar?',
+        'Hay cambios locales pendientes o en conflicto. Si recargas, se sustituira el estado actual por el almacenado. ¿Quieres continuar?',
       );
 
       if (!confirmed) {
@@ -2051,43 +2028,27 @@ export const App = () => {
     }
 
     try {
-      const response = await fetch(`${getApiBaseUrl()}/manual`);
-
-      if (!response.ok) {
-        throw new Error('No se pudo recargar el manual desde disco.');
-      }
-
-      const payload = (await response.json()) as
-        | { data?: unknown; revision?: string }
-        | ManualData;
-      const serverManual = normalizeManualData(
-        payload && typeof payload === 'object' && 'data' in payload
-          ? payload.data
-          : payload,
-      );
-      const revision =
-        payload && typeof payload === 'object' && 'revision' in payload
-          ? payload.revision
-          : '';
+      const result = await manualStorage.loadManual();
+      const serverManual = normalizeManualData(result.data);
 
       persistManualData(serverManual);
       setManualData(serverManual);
-      manualServerRevisionRef.current = typeof revision === 'string' ? revision : '';
+      manualServerRevisionRef.current = result.revision;
       setHasSaveConflict(false);
-      setManualOriginState('server');
+      setManualOriginState(result.source);
       setUndoStack([]);
       setRedoStack([]);
       setServerHealthState('online');
       setSaveSyncState('saved');
       setLastSavedAt(formatSavedAtTime());
       setSaveToast({
-        message: 'Estado recargado desde disco correctamente.',
+        message: 'Estado recargado correctamente desde el almacenamiento local.',
         tone: 'success',
       });
     } catch {
       setServerHealthState('offline');
       setSaveToast({
-        message: 'No se pudo recargar el estado desde el servidor.',
+        message: 'No se pudo recargar el estado almacenado.',
         tone: 'error',
       });
     }
@@ -2103,46 +2064,23 @@ export const App = () => {
     let isCancelled = false;
     const timeoutId = window.setTimeout(() => {
 
-    const persistManualOnServer = async () => {
+    const persistManualOnStorage = async () => {
       setSaveSyncState('saving');
       try {
-        const response = await fetch(`${getApiBaseUrl()}/save-manual`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            data: manualData,
-            expectedRevision: manualServerRevisionRef.current || undefined,
-          }),
-        });
-
-        const payload = (await response
-          .json()
-          .catch(() => ({}))) as {
-          currentRevision?: string;
-          error?: string;
-          revision?: string;
-        };
-
-        if (response.status === 409 || payload.error === 'save-conflict') {
-          throw new Error('save-conflict');
-        }
-
-        if (!response.ok) {
-          throw new Error('La respuesta del servidor no fue valida.');
-        }
+        const result = await manualStorage.saveManual(
+          manualData,
+          manualServerRevisionRef.current || undefined,
+        );
 
         if (!isCancelled) {
-          manualServerRevisionRef.current =
-            typeof payload.revision === 'string' ? payload.revision : '';
+          manualServerRevisionRef.current = result.revision;
           setHasSaveConflict(false);
           setServerHealthState('online');
-          setManualOriginState('server');
+          setManualOriginState('local-storage');
           setSaveSyncState('saved');
           setLastSavedAt(formatSavedAtTime());
           setSaveToast({
-            message: 'Cambios guardados y sincronizados con disco.',
+            message: 'Cambios guardados en el almacenamiento local.',
             tone: 'success',
           });
         }
@@ -2150,26 +2088,25 @@ export const App = () => {
         if (!isCancelled) {
           const isSaveConflict =
             error instanceof Error && error.message === 'save-conflict';
-          const isNetworkError =
-            error instanceof TypeError ||
-            (error instanceof Error && error.message === 'Failed to fetch');
+          const storageUnavailable =
+            error instanceof Error && error.message === 'storage-unavailable';
 
-          setServerHealthState(isSaveConflict ? 'online' : isNetworkError ? 'offline' : 'online');
+          setServerHealthState(isSaveConflict ? 'online' : storageUnavailable ? 'offline' : 'online');
           setHasSaveConflict(isSaveConflict);
           setSaveSyncState('error');
           setSaveToast({
             message: isSaveConflict
-              ? 'Otra instancia ha guardado cambios antes que esta. Recarga desde disco o importa antes de volver a guardar.'
-              : isNetworkError
-                ? 'No se pudo sincronizar con el servidor. Si necesitas asegurar los cambios, exporta el JSON antes de cerrar.'
-                : 'El servidor sigue activo, pero no ha podido guardar en disco. Revisa los logs o vuelve a intentarlo.',
+              ? 'Hay un conflicto de guardado con otra revision local.'
+              : storageUnavailable
+                ? 'No se pudo acceder al almacenamiento local. Exporta el JSON antes de cerrar si necesitas conservar cambios.'
+                : 'No se pudieron guardar los cambios en el almacenamiento local.',
             tone: 'error',
           });
         }
       }
     };
 
-    void persistManualOnServer();
+    void persistManualOnStorage();
     }, 800);
 
     return () => {
@@ -4232,39 +4169,14 @@ export const App = () => {
     closeModal();
   };
 
-  const handleExport = () => {
-    const exportPayload = manualData;
-    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
-      type: 'application/json',
-    });
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = 'manual.json';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(downloadUrl);
+  const handleExport = async () => {
+    await manualStorage.exportJsonToFile(manualData, 'manual.json');
     window.alert(
       'Guia: este archivo ya sale con el manual completo. Si quieres conservarlo solo en tu equipo, sustituyelo en src/data/manual.local.json.',
     );
   };
 
-  const downloadJsonFile = (payload: unknown, filename: string) => {
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json',
-    });
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(downloadUrl);
-  };
-
-  const handleExportBackup = () => {
+  const handleExportBackup = async () => {
     // Recordatorio: Para cualquier proceso en Java que gestione la lectura o escritura de estos archivos de backup o metadatos de fichas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
     const backupPayload: ManualBackupPayload = {
       fecha_creacion: new Date().toISOString(),
@@ -4273,7 +4185,7 @@ export const App = () => {
       data: manualData,
     };
 
-    downloadJsonFile(
+    await manualStorage.exportJsonToFile(
       backupPayload,
       `Prysma_Backup_${new Date().toISOString().slice(0, 10)}.json`,
     );
@@ -4335,8 +4247,7 @@ export const App = () => {
 
     try {
       // Recordatorio: Para cualquier proceso en Java que gestione la lectura o escritura de estos archivos de backup o metadatos de fichas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
-      const rawBackup = await file.text();
-      const parsedBackup = JSON.parse(rawBackup);
+      const parsedBackup = await manualStorage.importManualFromFile(file);
       const importedManualData = normalizeManualData(
         extractManualImportSource(parsedBackup),
       );
@@ -4368,27 +4279,12 @@ export const App = () => {
     setIsUploadingImage(true);
 
     try {
-      const formData = new FormData();
-      formData.append('image', imageFile);
-
       // Si en el futuro esta logica de envio de archivos se procesa en un
       // servidor Java, es imperativo usar try-catch-resources para el manejo
       // de los Streams y asegurar la liberacion de memoria en el entorno RGA
       // [cite: 2026-02-12].
-      const response = await fetch(`${getApiBaseUrl()}/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('La subida de la imagen no se completo correctamente.');
-      }
-
-      const result = (await response.json()) as {
-        filename?: string;
-        path?: string;
-      };
-      const imagePath = result.path ?? `/images/${result.filename ?? ''}`;
+      const storedImage = await runtimeBridge.storeMarkdownImage(imageFile);
+      const imagePath = storedImage.path;
 
       if (!imagePath || imagePath.endsWith('/')) {
         throw new Error('No se ha recibido una ruta valida para la imagen.');
@@ -4402,7 +4298,7 @@ export const App = () => {
       );
     } catch {
       window.alert(
-        'No se pudo subir la imagen pegada. Revisa que el servidor de imagenes este activo en el puerto 3001.',
+        'No se pudo procesar la imagen pegada para incrustarla en el Markdown.',
       );
     } finally {
       setIsUploadingImage(false);
@@ -4922,10 +4818,10 @@ export const App = () => {
           : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300';
   const serverStatusLabel =
     serverHealthState === 'online'
-      ? 'Servidor OK'
+      ? 'Almacenamiento OK'
       : serverHealthState === 'offline'
-        ? 'Servidor KO'
-        : 'Comprobando servidor';
+        ? 'Almacenamiento KO'
+        : 'Comprobando almacenamiento';
   const serverStatusTone =
     serverHealthState === 'online'
       ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
@@ -4964,7 +4860,7 @@ export const App = () => {
     hasSaveConflict,
     lastSavedAt,
     redoDepth: redoStack.length,
-    revisionLabel: manualServerRevisionRef.current || 'sin revision remota',
+    revisionLabel: manualServerRevisionRef.current || 'sin revision local',
     saveStatusLabel,
     serverStatusLabel,
     templatesCount: manualData.templates.length,
@@ -5031,7 +4927,7 @@ export const App = () => {
       <button
         type="button"
         onClick={() => {
-          void reloadManualFromServer();
+          void reloadManualFromStorage();
         }}
         aria-label="Recargar desde disco"
         title="Recargar desde disco"
@@ -6743,7 +6639,7 @@ export const App = () => {
                               </span>
                             ) : null}
                             <p className="text-xs text-slate-400 dark:text-slate-300">
-                              Soporta codigo, tablas, acordeones por encabezado e imagenes locales en `/public/images/`
+                              Soporta codigo, tablas, acordeones por encabezado e imagenes incrustadas o rutas locales
                             </p>
                           </div>
                         </div>
@@ -7305,7 +7201,7 @@ export const App = () => {
                               </span>
                             ) : null}
                             <p className="text-xs text-slate-400 dark:text-slate-300">
-                              Soporta codigo, tablas, acordeones por encabezado e imagenes locales en `/public/images/`
+                              Soporta codigo, tablas, acordeones por encabezado e imagenes incrustadas o rutas locales
                             </p>
                           </div>
                         </div>

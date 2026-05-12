@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Prysma</string>
+    <string name="title_activity_main">Prysma</string>
+    <string name="package_name">com.prysma.app</string>
+    <string name="custom_url_scheme">com.prysma.app</string>
+</resources>

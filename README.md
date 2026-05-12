@@ -177,6 +177,30 @@ $env:ELECTRON_START_URL="http://localhost:5173"
 npm run desktop
 ```
 
+### 5. Base preparada para Android con Capacitor
+
+La base del proyecto ya esta preparada para evolucionar a una APK manteniendo el frontend `React + Vite`.
+
+Flujo previsto:
+
+1. instalar dependencias del proyecto
+2. generar la build web con `npm run mobile:build`
+3. crear la carpeta nativa con `npm run mobile:android:add`
+4. sincronizar cambios web con `npm run mobile:android:sync`
+5. abrir Android Studio con `npm run mobile:android:open`
+
+Archivos clave para esta via:
+
+- [capacitor.config.ts](capacitor.config.ts)
+- [src/services/manualStorage.mobile.ts](src/services/manualStorage.mobile.ts)
+- [src/services/runtimeBridge.mobile.ts](src/services/runtimeBridge.mobile.ts)
+
+Notas:
+
+- `manualStorage.mobile` esta preparado para usar `Capacitor Filesystem` cuando la shell nativa lo exponga
+- `runtimeBridge.mobile` ya contempla almacenamiento de imagenes con Filesystem y fallback a `data URL`
+- mientras Capacitor no este instalado y sincronizado, el proyecto seguira funcionando en web/escritorio como hasta ahora
+
 ## Flujo recomendado de uso
 
 ### Uso diario en navegador
@@ -462,6 +486,18 @@ npm run desktop:build
 
 # build portable
 npm run desktop:portable
+
+# build base para mobile
+npm run mobile:build
+
+# crear proyecto android
+npm run mobile:android:add
+
+# sincronizar web + android
+npm run mobile:android:sync
+
+# abrir android studio
+npm run mobile:android:open
 ```
 
 ## Logs utiles

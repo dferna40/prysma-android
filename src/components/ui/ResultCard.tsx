@@ -4,6 +4,7 @@ import {
   getCategoryColorHex,
   getCategoryTheme,
 } from '../../constants/categoryColors';
+import { runtimeBridge } from '../../services/runtimeBridge';
 import { copyTextToClipboard } from '../../utils/clipboard';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import type { CategoryColorKey, KnowledgeEntry } from '../../types';
@@ -76,20 +77,6 @@ const normalizeHealthTarget = (value: string) => {
   }
 
   return null;
-};
-
-const getApiBaseUrl = () => {
-  if (typeof window === 'undefined') {
-    return 'http://localhost:3001';
-  }
-
-  const { origin } = window.location;
-
-  if (/localhost:517\d|127\.0\.0\.1:517\d/.test(origin)) {
-    return 'http://localhost:3001';
-  }
-
-  return origin;
 };
 
 const hexToRgba = (hex: string, alpha: number) => {
@@ -197,23 +184,7 @@ export function ResultCard({
     }));
 
     try {
-      const response = await fetch(
-        `${getApiBaseUrl()}/check-endpoint?url=${encodeURIComponent(targetUrl)}`,
-        {
-          method: 'GET',
-        },
-      );
-      const result = (await response.json()) as {
-        ok?: boolean;
-        reason?: string;
-        status?: number;
-        statusText?: string;
-        url?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(result.reason ?? 'request-failed');
-      }
+      const result = await runtimeBridge.checkEndpoint(targetUrl);
 
       setHealthStatuses((current) => ({
         ...current,
@@ -226,7 +197,9 @@ export function ResultCard({
             }
           : {
               detail:
-                result.reason === 'request-failed'
+                result.reason === 'unsupported-local-target'
+                  ? 'No se valida localhost desde esta app'
+                  : result.reason === 'request-failed'
                   ? 'No se pudo conectar'
                   : result.status
                   ? `Respondio ${result.status}${result.statusText ? ` ${result.statusText}` : ''}`
@@ -238,7 +211,7 @@ export function ResultCard({
       setHealthStatuses((current) => ({
         ...current,
         [commandLabel]: {
-          detail: 'No se pudo validar con el servidor',
+          detail: 'No se pudo validar el endpoint',
           state: 'error',
         },
       }));
